@@ -36,3 +36,7 @@ where.exe msbuild
 where.exe nvcc
 nvcc --version
 ```
+
+## 版本日志更新说明
+
+- 从基线版本v1.0往后，每次修改代码后，都在更新日志.md中写入对应的版本和修改的内容
