@@ -36,9 +36,19 @@ def _child_env() -> dict:
     return env
 
 
+def _port_in_use(port: int = 8080) -> bool:
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
 def start_service() -> None:
     global _proc
     if _proc and _proc.poll() is None:
+        return
+    if _port_in_use():
+        # 8080 已有服务(例如手动启动的)在跑：托盘只做管理入口，不重复拉起
         return
     _proc = subprocess.Popen([str(VENV_PYTHON), str(ROOT / "assistant" / "run_webui.py")],
                              cwd=str(ROOT), env=_child_env(),

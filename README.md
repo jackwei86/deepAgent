@@ -60,8 +60,9 @@ python install_tools.py --token <你的API密钥>
 ## 桌面化（独立窗口 + 托盘）
 
 - **PWA 独立窗口**：Edge/Chrome 打开 `http://127.0.0.1:8080` → 地址栏右侧"安装为应用"，即得无地址栏的独立窗口；
-- **托盘程序**：`assistant\start_tray.bat`（无窗口启动）——系统托盘出现 DeepAgent 图标，
-  菜单：打开聊天界面 / 打开素材库 / 重启服务 / 退出；
+- **托盘程序**：双击 `assistant\start_tray.vbs`（**完全无命令行窗口**；也可用 `start_tray.bat`，会闪一下黑框）——
+  系统托盘出现 DeepAgent 图标，菜单：打开聊天界面 / 打开素材库 / 重启服务 / 退出；
+  若 8080 已有服务在跑，托盘自动复用，不会重复拉起；
 - **Tauri 壳**：需 Rust 工具链（`winget install Rustlang.Rustup`），工程位 `desktop/tauri-app`（见该目录说明）。
 
 ## 已验证的执行链路
