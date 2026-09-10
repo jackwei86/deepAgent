@@ -1,7 +1,7 @@
 """
 title: DeepAgent 图像抠图
 author: DeepAgent
-version: 1.0.0
+version: 1.1.0
 required_open_webui_version: 0.5.0
 """
 import os
@@ -55,20 +55,24 @@ class Tools:
         self,
         mode: str = "grabcut",
         background: str = "transparent",
+        file_name: str = "",
         __event_emitter__=None,
         __files__=None,
         __messages__=None,
+        __user__=None,
         __request__=None,
     ) -> str:
-        """对用户上传的图片执行抠图（前景提取），并把带透明背景的结果图片返回预览。
-        重要：本工具会自动从用户消息的附件中定位图片文件——即使你无法直接查看图片内容，
-        只要用户表达了对照片/图片的抠图/去背景意图，就必须立即调用本工具。
-        不要以"没有看到图片"为由拒绝或要求用户重新上传；若消息中确实没有附件，工具会返回明确的提示。
+        """对图片执行抠图（前景提取），返回抠图结果。
+        素材来源（二选一）：① 用户消息中附带的图片；② 素材库文件。
+        重要："素材库"、"收藏夹"、"当前目录"指当前用户的素材库目录——
+        当用户提到这些词并给出文件名时，必须把文件名传入 file_name 参数直接调用，
+        不要要求用户重新上传；若素材库和附件中都没有该文件，工具会返回明确提示。
+        示例："把这张图抠出来"、"抠素材库里的 photo.png，换白底"。
 
         :param mode: 抠图模式。"grabcut"=通用场景智能分割（默认，取画面中央主体）；
                      "chroma"=绿幕键控（适合纯绿背景素材）。
-        :param background: 抠出前景的背景填充方式，"transparent"=透明PNG（默认）、
-                           "white"=白底、"green"=绿底。
+        :param background: 抠出前景的背景："transparent"=透明PNG（默认）、"white"=白底、"green"=绿底。
+        :param file_name: 素材库文件名（如 photo.png 或 image/photo.png）。消息已附带图片时留空。
         """
         v = getattr(self, "valves", None) or self.Valves()
         if mode not in ("grabcut", "chroma"):
@@ -77,9 +81,10 @@ class Tools:
             background = "transparent"
         return await tool_impl.execute_tool_task(
             event_emitter=__event_emitter__, request=__request__, files=__files__,
-            messages=__messages__,
+            messages=__messages__, user=__user__,
+            media_files=[file_name] if file_name else None,
             task_type="image_matting", name="图像抠图",
-            description=f"对上传图片抠取前景，模式 {mode}，背景 {background}",
+            description=f"对图片抠取前景，模式 {mode}，背景 {background}",
             sdk_command="matting",
             parameters={"mode": mode, "background": background},
             output_format="png", input_roles=["source"],

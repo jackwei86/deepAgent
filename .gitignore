@@ -15,3 +15,6 @@ data/
 # 工具/IDE
 .codegraph/
 .zcode/
+
+# 用户素材库(运行时数据)
+media/

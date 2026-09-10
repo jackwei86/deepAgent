@@ -17,6 +17,9 @@ DATA_DIR = Path(os.environ.get("DEEPAGENT_DATA_DIR", PROJECT_ROOT / "data"))
 TASKS_DIR = DATA_DIR / "tasks"          # 每个任务一个子目录: <task_id>/task.json + result.*
 OUTPUTS_DIR = DATA_DIR / "outputs"      # 独立产物目录(临时/手工执行)
 
+# 素材库: media/<用户名>/image|video (对话中"素材库/收藏夹/当前目录"即指此目录)
+MEDIA_DIR = Path(os.environ.get("DEEPAGENT_MEDIA_DIR", PROJECT_ROOT / "media"))
+
 # Open WebUI 数据目录(其上传文件保存在 <DATA_DIR>/uploads/<file_id>/<name>)
 WEBUI_DATA_DIR = Path(os.environ.get("DATA_DIR", str(DATA_DIR / "webui")))
 WEBUI_UPLOADS_DIR = WEBUI_DATA_DIR / "uploads"
@@ -30,5 +33,5 @@ CHILD_ENV_BASE = {**os.environ, "OPENCV_LOG_LEVEL": "ERROR"}
 
 
 def ensure_dirs() -> None:
-    for d in (TASKS_DIR, OUTPUTS_DIR):
+    for d in (TASKS_DIR, OUTPUTS_DIR, MEDIA_DIR):
         d.mkdir(parents=True, exist_ok=True)

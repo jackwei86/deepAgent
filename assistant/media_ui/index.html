@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepAgent 素材库与工具说明</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f4f5f7; color: #222; display: flex; height: 100vh; }
+  .sidebar { width: 300px; background: #1f2430; color: #d8dbe2; display: flex; flex-direction: column; flex-shrink: 0; }
+  .sidebar h1 { font-size: 15px; padding: 14px 16px; color: #fff; border-bottom: 1px solid #2c3242; }
+  .tabs { display: flex; }
+  .tab { flex: 1; text-align: center; padding: 10px 0; cursor: pointer; background: #262c3a; font-size: 13px; }
+  .tab.active { background: #1f2430; color: #7ab8ff; border-bottom: 2px solid #7ab8ff; }
+  .panel { flex: 1; overflow-y: auto; padding: 10px 6px; display: none; }
+  .panel.active { display: block; }
+  .tree-dir { margin: 2px 0; }
+  .tree-label { padding: 5px 8px; cursor: pointer; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .tree-label:hover { background: #2c3242; }
+  .tree-children { margin-left: 16px; }
+  .tree-file { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; border-radius: 6px; font-size: 12.5px; color: #aab3c5; }
+  .tree-file:hover { background: #2c3242; color: #fff; }
+  .dropzone { border: 2px dashed #4a5266; border-radius: 8px; padding: 14px; text-align: center; font-size: 12.5px; color: #8a93a6; margin: 8px 10px; cursor: pointer; }
+  .dropzone.drag { border-color: #7ab8ff; color: #7ab8ff; }
+  main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .toolbar { padding: 10px 18px; background: #fff; border-bottom: 1px solid #e3e5ea; display: flex; align-items: center; gap: 8px; }
+  .toolbar .title { font-size: 15px; font-weight: 600; margin-right: auto; }
+  .content { flex: 1; overflow-y: auto; padding: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
+  .card { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .card .thumb { height: 120px; background: #eceef2; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
+  .card .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .card .thumb .icon { font-size: 34px; }
+  .card .meta { padding: 8px 10px; font-size: 12px; }
+  .card .meta .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+  .card .meta .ops { margin-top: 6px; display: flex; gap: 6px; }
+  .card .meta .ops a, .card .meta .ops button { font-size: 11.5px; color: #3b82f6; text-decoration: none; background: none; border: none; cursor: pointer; padding: 0; }
+  .card .meta .ops button.del { color: #b3453f; }
+  .empty { color: #98a0ae; text-align: center; margin-top: 60px; font-size: 14px; }
+  .doc h3 { margin: 18px 0 6px; font-size: 15px; }
+  .doc p { font-size: 13px; color: #444; margin: 4px 0; line-height: 1.6; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 14px; background: #fff; font-size: 12.5px; }
+  th, td { border: 1px solid #e3e5ea; padding: 6px 9px; text-align: left; }
+  th { background: #f0f2f5; }
+  code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  #lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 50; cursor: zoom-out; }
+  #lightbox img, #lightbox video { max-width: 92%; max-height: 92%; border-radius: 8px; }
+  .toast { position: fixed; top: 16px; right: 16px; background: #222; color: #fff; padding: 9px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .25s; z-index: 60; }
+  .toast.show { opacity: .92; }
+</style>
+</head>
+<body>
+  <div class="sidebar">
+    <h1>📚 DeepAgent 素材库</h1>
+    <div class="tabs">
+      <div class="tab active" data-tab="media">素材库</div>
+      <div class="tab" data-tab="docs">工具说明</div>
+    </div>
+    <div class="panel active" id="panel-media">
+      <div class="dropzone" id="dropzone">拖拽图片/视频到此上传<br>或点击选择文件（自动分类到 image / video）</div>
+      <input type="file" id="fileInput" multiple accept="image/*,video/*" hidden>
+      <div id="tree"></div>
+    </div>
+    <div class="panel" id="panel-docs"><div id="docs" style="color:#aab3c5; font-size:12.5px; padding:6px;">加载中…</div></div>
+  </div>
+  <main>
+    <div class="toolbar">
+      <div class="title" id="viewTitle">全部素材</div>
+      <button class="btn gray" onclick="loadTaskOutputs()">从任务产物导入</button>
+      <button class="btn gray" onclick="location.reload()">刷新</button>
+    </div>
+    <div class="content" id="content"><div class="empty">加载中…</div></div>
+  </main>
+  <div id="lightbox" onclick="this.style.display='none'"></div>
+  <div class="toast" id="toast"></div>
+
+<script>
+const API = '/media/api';
+const TOKEN = localStorage.getItem('token') || '';
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+async function api(path, options = {}) {
+  const resp = await fetch(API + path, {
+    ...options,
+    headers: { Authorization: 'Bearer ' + TOKEN, ...(options.headers || {}) },
+  });
+  if (resp.status === 401) { document.getElementById('content').innerHTML =
+    '<div class="empty">未检测到登录态：请先在 <a href="/" target="_blank">聊天首页</a> 登录，<br>然后刷新本页。</div>';
+    throw new Error('unauthorized'); }
+  if (!resp.ok) throw new Error((await resp.text()).slice(0, 200));
+  return resp.json();
+}
+
+async function loadTree() {
+  const tree = await api('/tree');
+  const el = document.getElementById('tree');
+  el.innerHTML = '';
+  el.appendChild(renderDir(tree, true));
+  viewAll(tree);
+}
+function renderDir(node, isRoot) {
+  const wrap = document.createElement('div');
+  wrap.className = 'tree-dir';
+  const label = document.createElement('div');
+  label.className = 'tree-label';
+  label.innerHTML = (isRoot ? '👤 ' : (node.name === 'image' ? '🖼️ ' : node.name === 'video' ? '🎬 ' : '📁 ')) + node.name;
+  label.onclick = () => viewAll(node);
+  wrap.appendChild(label);
+  const kids = document.createElement('div');
+  kids.className = 'tree-children';
+  (node.children || []).forEach(child => {
+    if (child.type === 'dir') kids.appendChild(renderDir(child, false));
+    else {
+      const f = document.createElement('div');
+      f.className = 'tree-file';
+      f.dataset.path = child.rel_path;
+      f.innerHTML = (child.kind === 'image' ? '🖼️' : '🎬') + ` <span>${child.name}</span><span style="margin-left:auto;font-size:11px;color:#6c7689">${fmt(child.size)}</span>`;
+      f.onclick = () => preview(child.rel_path, child.kind === 'image');
+      kids.appendChild(f);
+    }
+  });
+  wrap.appendChild(kids);
+  return wrap;
+}
+
+let ALL_FILES = [];
+function viewAll(node) {
+  document.getElementById('viewTitle').textContent = '素材库：' + node.name;
+  ALL_FILES = [];
+  collect(node);
+  renderGrid(ALL_FILES);
+}
+function collect(node) {
+  (node.children || []).forEach(c => { if (c.type === 'dir') collect(c); else ALL_FILES.push(c); });
+}
+function renderGrid(files) {
+  const c = document.getElementById('content');
+  if (!files.length) { c.innerHTML = '<div class="empty">空空如也——拖拽图片/视频到左侧上传，或从任务产物导入</div>'; return; }
+  c.innerHTML = '<div class="grid"></div>';
+  const grid = c.querySelector('.grid');
+  files.forEach(f => grid.appendChild(card(f)));
+}
+function card(f) {
+  const div = document.createElement('div');
+  div.className = 'card';
+  const url = `${API}/download?path=${encodeURIComponent(f.rel_path)}`;
+  const thumb = f.kind === 'image'
+    ? `<img src="${url}" loading="lazy" onclick="preview('${encodeURIComponent(f.rel_path)}', true)">`
+    : `<div class="icon" onclick="preview('${encodeURIComponent(f.rel_path)}', false)">🎬</div>`;
+  div.innerHTML = `<div class="thumb">${thumb}</div>
+    <div class="meta"><div class="name" title="${f.name}">${f.name}</div>
+    <div class="ops"><a href="${url}" download>下载</a><button class="del" onclick="delFile('${encodeURIComponent(f.rel_path)}')">删除</button></div></div>`;
+  return div;
+}
+function preview(rel, isImage) {
+  const lb = document.getElementById('lightbox');
+  const url = `${API}/download?path=${rel}`;
+  lb.innerHTML = isImage ? `<img src="${url}">` : `<video src="${url}" controls autoplay></video>`;
+  lb.style.display = 'flex';
+}
+async function delFile(rel) {
+  if (!confirm('确定删除该素材？')) return;
+  await api('/file?path=' + rel, { method: 'DELETE' });
+  toast('已删除'); loadTree();
+}
+
+const dz = document.getElementById('dropzone');
+dz.onclick = () => document.getElementById('fileInput').click();
+document.getElementById('fileInput').onchange = e => uploadFiles(e.target.files);
+dz.ondragover = e => { e.preventDefault(); dz.classList.add('drag'); };
+dz.ondragleave = () => dz.classList.remove('drag');
+dz.ondrop = e => { e.preventDefault(); dz.classList.remove('drag'); uploadFiles(e.dataTransfer.files); };
+async function uploadFiles(fileList) {
+  if (!fileList || !fileList.length) return;
+  const fd = new FormData();
+  [...fileList].forEach(f => fd.append('files', f));
+  const r = await api('/upload', { method: 'POST', body: fd });
+  toast(`已导入 ${r.saved.length} 个${r.rejected.length ? `，跳过 ${r.rejected.length} 个不支持的类型` : ''}`);
+  loadTree();
+}
+
+async function loadTaskOutputs() {
+  const outputs = await api('/task-outputs');
+  const c = document.getElementById('content');
+  document.getElementById('viewTitle').textContent = '任务产物 → 导入素材库';
+  if (!outputs.length) { c.innerHTML = '<div class="empty">暂无任务产物</div>'; return; }
+  c.innerHTML = '<div class="grid"></div>';
+  const grid = c.querySelector('.grid');
+  outputs.forEach(o => {
+    const kind = o.name.match(/\.(jpe?g|png|bmp|webp|gif)$/i) ? 'image' : 'video';
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `<div class="thumb"><div class="icon">${kind === 'image' ? '🖼️' : '🎬'}</div></div>
+      <div class="meta"><div class="name" title="${o.task_id}">${o.name}</div>
+      <div style="color:#888">${o.task_id}</div>
+      <div class="ops"><button onclick="importTask('${o.path.replace(/\\/g, '\\\\')}')">导入素材库</button></div></div>`;
+    grid.appendChild(div);
+  });
+}
+async function importTask(path) {
+  const r = await api('/import-task', { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) });
+  toast('已导入素材库：' + r.rel_path); loadTree();
+}
+
+async function loadDocs() {
+  const docs = await api('/tool-docs');
+  const el = document.getElementById('docs');
+  el.style.color = '#d8dbe2'; el.style.fontSize = '13px';
+  el.innerHTML = docs.map(tool => `
+    <div class="doc">
+      <h3>${tool.name} <code style="background:#31405c;color:#9cc3ff">${tool.id}</code></h3>
+      ${tool.functions.map(fn => `
+        <p>${(fn.description || '').replace(/\n/g, '<br>')}</p>
+        ${fn.parameters.length ? `<table><tr><th>参数</th><th>类型</th><th>默认</th><th>说明</th></tr>
+          ${fn.parameters.map(p => `<tr><td><code>${p.name}</code></td><td>${p.type}</td>
+          <td>${p.default ?? '—'}</td><td>${p.description || ''}</td></tr>`).join('')}</table>`
+          : '<p><i>无参数</i></p>'}`).join('')}
+    </div>`).join('');
+}
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+  if (t.dataset.tab === 'docs') loadDocs();
+});
+
+function fmt(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + 'M' : n > 1024 ? (n / 1024).toFixed(0) + 'K' : n + 'B'; }
+loadTree().catch(e => console.warn(e));
+</script>
+</body>
+</html>

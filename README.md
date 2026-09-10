@@ -34,15 +34,35 @@ cd cpp-sdk\scripts && build_windows.bat
 :: 2. 安装 Python 环境(CUDA 12.8 版 torch + open-webui + faster-whisper)
 cd ..\assistant\scripts && setup_env.bat
 
-:: 3. 启动服务
+:: 3. 启动服务(聊天 + 素材库 同端口)
 cd .. && start.bat
-:: 浏览器打开 http://127.0.0.1:8080 → 创建管理员账号
+:: 聊天界面  http://127.0.0.1:8080
+:: 素材库    http://127.0.0.1:8080/media-ui/
 
 :: 4. 注册 DeepAgent 工具(管理员 API 密钥在 设置→账号→API密钥)
 python install_tools.py --token <你的API密钥>
 
 :: 5. 配置 LLM 与语音(见 docs/项目需求与实现步骤.md §6)
 ```
+
+## 素材库
+
+对话中说 **"素材库"、"收藏夹"、"当前目录"** 即指当前登录用户的素材目录
+`media\<用户名>\`（`image\` 存图片、`video\` 存视频）。
+
+- **网页管理**：访问 `/media-ui/`——树状浏览、拖拽上传（自动按扩展名分类）、
+  预览（图片放大/视频播放）、下载导出、删除、一键导入任务产物；
+- **对话引用**：把文件放入素材库后直接说 *"处理素材库里的 photo.jpg，磨皮强一点"*，
+  无需上传附件（各工具的 `file_name` 参数）；
+- **工具参数说明**：素材库页面的"工具说明"标签页列出全部工具与参数，与注册表实时同步；
+- **多用户**：素材目录按登录用户名隔离。
+
+## 桌面化（独立窗口 + 托盘）
+
+- **PWA 独立窗口**：Edge/Chrome 打开 `http://127.0.0.1:8080` → 地址栏右侧"安装为应用"，即得无地址栏的独立窗口；
+- **托盘程序**：`assistant\start_tray.bat`（无窗口启动）——系统托盘出现 DeepAgent 图标，
+  菜单：打开聊天界面 / 打开素材库 / 重启服务 / 退出；
+- **Tauri 壳**：需 Rust 工具链（`winget install Rustlang.Rustup`），工程位 `desktop/tauri-app`（见该目录说明）。
 
 ## 已验证的执行链路
 

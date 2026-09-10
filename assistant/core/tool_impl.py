@@ -17,6 +17,7 @@ if str(_ASSISTANT_DIR) not in sys.path:
     sys.path.insert(0, str(_ASSISTANT_DIR))
 
 from core import config, sdk_runner, task_manager  # noqa: E402
+from core import media as media_lib  # noqa: E402
 
 _MAX_INLINE_PREVIEW_BYTES = 3 * 1024 * 1024  # base64 内联预览上限
 
@@ -281,12 +282,14 @@ async def execute_tool_task(
     llm_label: tuple[str, str] = ("open-webui", "unknown"),
     progress_label: str = "处理中",
     messages: Optional[list] = None,
+    media_files: Optional[list[str]] = None,
+    user: Optional[dict] = None,
 ) -> str:
     """Tool 共用执行流程。input_roles 指定各附件的角色(如 ["source","foreground"])。
 
-    附件来源两级解析：优先顶层 __files__；为空时从 __messages__ 最后一条
-    用户消息的 files 中提取(Open WebUI 前端把附件挂在消息内，顶层 files
-    在部分版本/流程下为空)。
+    素材来源优先级：
+      1. 聊天附件(顶层 __files__ → 消息内 files → content 的 image_url 部件)
+      2. 素材库 file_name("素材库/收藏夹/当前目录"即 media/<用户名>/ 目录)
     """
     resolved = resolve_message_files(files)
     if not resolved:
@@ -303,9 +306,24 @@ async def execute_tool_task(
         resolved = _extract_from_message_content(messages)
     _log_payload(files, messages, resolved)
     roles = input_roles or ["source"] * max(1, len(resolved))
+
+    # 素材库回退: LLM 从"素材库/收藏夹/当前目录"等话语中提取的文件名
+    if not resolved and media_files:
+        user_name = (user or {}).get("name") or "default"
+        for mf in media_files:
+            if not mf:
+                continue
+            p = media_lib.resolve_in_media(user_name, mf)
+            if p is None:
+                await emit_status(event_emitter, f"素材库中未找到 {mf}", done=True, error=True)
+                return (f"⚠️ 素材库(media/{media_lib.sanitize_username(user_name)}/)中"
+                        f"未找到「{mf}」。请确认文件名，或先把文件上传/复制到素材库的"
+                        f"image(图片)/video(视频)子目录。")
+            resolved.append({"id": p.stem, "name": p.name, "path": str(p)})
+
     if not resolved:
-        return ("⚠️ 未在消息中找到素材文件。请先上传图片/视频再发起该任务，"
-                "或在附件后再重试一次。")
+        return ("⚠️ 未在消息中找到素材文件。可以：①直接上传图片/视频后发送；"
+                "或 ②把文件放入素材库后说\"处理素材库里的 <文件名>\"。")
     if len(resolved) < len(roles):
         return f"⚠️ 该任务需要 {len(roles)} 个素材文件(角色: {', '.join(roles)})，当前消息只有 {len(resolved)} 个。"
 

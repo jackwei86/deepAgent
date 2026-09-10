@@ -29,7 +29,8 @@ if exist "!VENV!\Lib\site-packages\nvidia\cudnn\bin" set "PATH=!VENV!\Lib\site-p
 rem silence OpenCV INFO/WARN noise in child processes
 set "OPENCV_LOG_LEVEL=ERROR"
 
-echo Starting Open WebUI: http://127.0.0.1:8080
+echo Starting DeepAgent (Open WebUI + media library): http://127.0.0.1:8080
+echo   media library UI: http://127.0.0.1:8080/media-ui/
 echo (First run: open the page and create the admin account, then see README for LLM/STT setup)
-open-webui serve --host 127.0.0.1 --port 8080
+python "!ROOT!\assistant\run_webui.py"
 endlocal
