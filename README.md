@@ -1,5 +1,7 @@
 # DeepAgent — AI 图像/视频任务助手
 
+![版本](https://img.shields.io/badge/版本-v1.1.0-blue) ![基座](https://img.shields.io/badge/基座-Open_WebUI_0.6.43-3b82f6) ![SDK](https://img.shields.io/badge/C++_SDK-1.0.0-green) ![更新日志](https://img.shields.io/badge/更新日志-CHANGELOG.md-grey)
+
 基于开源项目 **[Open WebUI](https://github.com/open-webui/open-webui)**(BSD) 二次开发的 AI 任务助手：
 用户通过**文字或语音**下达指令，由可自由切换的国产/开源 LLM(DeepSeek / 智谱 GLM / MiniMax / Ollama…)
 解析出具体任务与参数，固化为**标准任务单 JSON** 后，以**命令行方式调用本地 C++ 图像/视频处理 SDK** 执行，
