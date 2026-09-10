@@ -1,0 +1,16 @@
+# DeepAgent 助手层依赖
+#
+# ⚠️ 安装顺序很重要(为使用 CUDA 版 torch，见 assistant/scripts/setup_env.bat)：
+#   1) python -m pip install "torch==2.11.0+cu128" --index-url https://download.pytorch.org/whl/cu128
+#      精确锁定 +cu128 标签(仅 pytorch 官方索引有)，防止本机 pip.ini 的
+#      国内镜像提供同名 CPU 轮子被优先选中；CPU 版会静默失去 GPU 加速
+#   2) python -m pip install -r requirements.txt   # torch 已满足，pip 不会降级为 CPU 版
+#
+# 本文件在 torch 之后安装：
+open-webui>=0.6.10,<0.7   # 开源 AI 助手基座(BSD)，含 FastAPI 后端与聊天 UI
+faster-whisper>=1.0       # 本地语音识别(STT)，Open WebUI Audio 设置可选其模型
+nvidia-cublas-cu12        # faster-whisper GPU 所需 CUDA 12 运行时 DLL
+nvidia-cudnn-cu12         # faster-whisper GPU 所需 cuDNN DLL
+httpx>=0.27               # Tools 上传结果文件到 Open WebUI
+
+# —— C++ SDK (deepagent-cv.exe) 无 Python 依赖，构建见 cpp-sdk/scripts/build_windows.bat

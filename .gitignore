@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pipcache/
+
+# C++ 构建产物
+cpp-sdk/build/
+
+# 运行时数据与密钥（绝不入库）
+data/
+.webui_secret_key
+*.log
+
+# 工具/IDE
+.codegraph/
+.zcode/
