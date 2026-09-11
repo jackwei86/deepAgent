@@ -63,6 +63,7 @@ TaskOrder
 | `image_matting` | 图像抠图（前景提取） | `matting` |
 | `image_composite` | 图像合成（前景贴到底图） | `composite` |
 | `video_beauty` | 视频美颜（逐帧处理） | `video-beauty` |
+| `restore` | 撤销/还原：不做处理，结果内容=指定历史任务的产物（1.1 新增，由助手"撤销还原"工具生成） | `restore`(Python 内置拷贝，不经 C++) |
 | `custom` | 第三方自定义任务 | `custom` |
 
 #### 3.2.2 各任务 `parameters` 定义

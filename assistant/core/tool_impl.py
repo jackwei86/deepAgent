@@ -284,14 +284,29 @@ async def execute_tool_task(
     messages: Optional[list] = None,
     media_files: Optional[list[str]] = None,
     user: Optional[dict] = None,
+    restore_task_id: Optional[str] = None,
 ) -> str:
     """Tool 共用执行流程。input_roles 指定各附件的角色(如 ["source","foreground"])。
 
     素材来源优先级：
+      0. restore_task_id(撤销/还原)：以指定历史任务的产物为结果，不做处理
       1. 聊天附件(顶层 __files__ → 消息内 files → content 的 image_url 部件)
       2. 素材库 file_name("素材库/收藏夹/当前目录"即 media/<用户名>/ 目录)
     """
-    resolved = resolve_message_files(files)
+    resolved = []
+    if restore_task_id:
+        target = task_manager.load_task(restore_task_id)
+        result = (target.execution.get("result") or {}) if target else {}
+        rp = Path(result.get("output_path") or "")
+        if target is None or not rp.is_file():
+            return (f"⚠️ 找不到要还原到的历史任务 `{restore_task_id}` 或其产物文件。"
+                    f"请核对任务单编号(可在此前工具返回的\"任务单\"信息中查看)。")
+        resolved = [{"id": restore_task_id, "name": rp.name, "path": str(rp)}]
+        output_format = rp.suffix.lstrip(".").lower() or "jpg"
+        parent_task_id = restore_task_id
+        pipeline_id = target.data.get("pipeline_id") or restore_task_id
+    if not resolved:
+        resolved = resolve_message_files(files)
     if not resolved:
         for msg in reversed(messages or []):
             if not isinstance(msg, dict):

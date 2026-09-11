@@ -101,6 +101,20 @@ def run_task(order: TaskOrder, *, on_progress: Optional[ProgressCb] = None,
     command = [str(config.CV_EXE), "run", "--task", str(task_file)]
     _normalize_ascii_paths(order)
     order.mark_running(command)
+
+    # restore: 撤销/还原——不做任何处理，直接以历史任务产物为结果(纯 Python 拷贝)，
+    # 使链上出现"内容回到检查点"的新任务；文件为真相，与普通任务同样登记。
+    if order.data.get("task", {}).get("sdk_command") == "restore":
+        import shutil
+        src = Path(order.data["inputs"][0]["path"])
+        out = Path(order.output_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, out)
+        order.mark_finished("success", exit_code=0, result={
+            "output_path": str(out), "size_bytes": out.stat().st_size, "elapsed_ms": 0})
+        if on_log:
+            on_log(f"还原完成: {src.name} -> {out.name}")
+        return order.execution
     if on_log:
         on_log(f"命令行: {' '.join(command)}")
 
