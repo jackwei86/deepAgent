@@ -70,6 +70,7 @@ class Tools:
         ② 素材库文件——file_name=底图文件名，file_name2=前景文件名。
         重要："素材库"、"收藏夹"、"当前目录"指当前用户的素材库目录——用户提到这些词
         并给出文件名时，直接把文件名传入 file_name/file_name2 调用，不要要求重新上传。
+        处理链：若处理的素材本身是此前任务的结果，系统会自动登记派生关系（parent/链ID），在素材库"任务产物"页可查看完整处理链版本树，并支持从任意历史结果继续处理。
         示例："把素材库里的 logo.png 合成到 bg.jpg 上，缩小一半"（file_name=bg.jpg,
         file_name2=logo.png, scale=0.5）；用户指定位置时 x/y 传具体像素值且 center=false。
 

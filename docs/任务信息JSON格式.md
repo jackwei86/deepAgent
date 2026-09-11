@@ -1,6 +1,6 @@
 # DeepAgent 任务信息 JSON 格式规范
 
-> 版本：`schema_version 1.0`　　更新：2026-09-10
+> 版本：`schema_version 1.1`　　更新：2026-09-11（1.1 新增 `parent_task_id`/`pipeline_id` 任务链字段）
 >
 > 用途：AI 任务助手将用户语音/文字经 LLM 解析后得到的"具体要执行的任务"固化为一份**任务单（Task Order）JSON**，
 > 落盘保存并可直接发送给第三方工具执行。第三方工具只需按本规范读取 `inputs` + `task`，
@@ -17,8 +17,10 @@
 
 ```text
 TaskOrder
-├── schema_version   string  固定 "1.0"
+├── schema_version   string  固定 "1.1"
 ├── task_id          string  全局唯一，格式 YYYYMMDD-HHMMSS-XXXX（时间 + 4位随机）
+├── parent_task_id   string  任务链：直接上游任务的 task_id（素材取自其产物时自动登记；1.1 新增，可为 null）
+├── pipeline_id      string  任务链：链 ID = 首个任务的 task_id，其后任务继承（1.1 新增，可为 null）
 ├── created_at       string  ISO8601 带时区，任务单创建时间
 ├── updated_at       string  ISO8601 带时区，最后更新时间
 ├── origin           object  任务来源（用户输入与 LLM 解析信息）        【必填】

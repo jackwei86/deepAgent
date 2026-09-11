@@ -16,7 +16,7 @@ from typing import Any, Callable, Optional
 
 from . import config
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 # task.type -> 默认输出扩展名
 TASK_OUTPUT_EXT = {
@@ -175,8 +175,14 @@ def make_input_entry(path: str | Path, *, role: str = "source", file_id: str = "
 
 def create_task(*, origin: dict, task_type: str, name: str, description: str,
                 sdk_command: str, parameters: dict, inputs: list[dict],
-                output_format: Optional[str] = None) -> TaskOrder:
-    """创建任务单并落盘(状态 pending)。inputs 为 make_input_entry 的结果列表。"""
+                output_format: Optional[str] = None,
+                parent_task_id: Optional[str] = None,
+                pipeline_id: Optional[str] = None) -> TaskOrder:
+    """创建任务单并落盘(状态 pending)。inputs 为 make_input_entry 的结果列表。
+
+    parent_task_id/pipeline_id 构成任务链(处理历史)：以某任务产物为素材时，
+    parent 指向该任务；pipeline_id 为链 ID(首个任务默认为自己的 task_id)。
+    """
     config.ensure_dirs()
     task_id = new_task_id()
     task_dir = config.TASKS_DIR / task_id
@@ -188,6 +194,8 @@ def create_task(*, origin: dict, task_type: str, name: str, description: str,
     data = {
         "schema_version": SCHEMA_VERSION,
         "task_id": task_id,
+        "parent_task_id": parent_task_id,
+        "pipeline_id": pipeline_id,
         "created_at": _now_iso(),
         "updated_at": _now_iso(),
         "origin": {
@@ -229,6 +237,46 @@ def create_task(*, origin: dict, task_type: str, name: str, description: str,
     order = TaskOrder(data, task_dir / "task.json")
     order.save()
     return order
+
+
+def get_chain(task_id: str) -> Optional[dict]:
+    """返回任务所在处理链（版本树）：按创建时间正序的任务列表。
+
+    链 ID = 首个任务的 task_id（其后任务继承）。找不到任务返回 None。
+    """
+    order = load_task(task_id)
+    if not order:
+        return None
+    pipeline_id = order.data.get("pipeline_id") or task_id
+
+    items: list[dict] = []
+    if config.TASKS_DIR.is_dir():
+        for d in config.TASKS_DIR.iterdir():
+            f = d / "task.json"
+            if not f.is_file():
+                continue
+            try:
+                obj = json.loads(f.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            if obj.get("pipeline_id") != pipeline_id and obj.get("task_id") != pipeline_id:
+                continue
+            ex = obj.get("execution") or {}
+            res = (ex.get("result") or {}).get("output_path")
+            items.append({
+                "task_id": obj.get("task_id"),
+                "parent_task_id": obj.get("parent_task_id"),
+                "type": (obj.get("task") or {}).get("type"),
+                "name": (obj.get("task") or {}).get("name"),
+                "status": ex.get("status"),
+                "created_at": obj.get("created_at"),
+                "output_path": res,
+                "step": len(items) + 1,
+            })
+    items.sort(key=lambda x: x.get("created_at") or "")
+    for i, it in enumerate(items, 1):
+        it["step"] = i
+    return {"pipeline_id": pipeline_id, "count": len(items), "tasks": items}
 
 
 def load_task(task_id: str) -> Optional[TaskOrder]:

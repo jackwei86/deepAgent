@@ -327,6 +327,24 @@ async def execute_tool_task(
     if len(resolved) < len(roles):
         return f"⚠️ 该任务需要 {len(roles)} 个素材文件(角色: {', '.join(roles)})，当前消息只有 {len(resolved)} 个。"
 
+    # 任务链推断: 素材来自某任务产物(data/tasks/<task_id>/)时，登记 parent/pipeline
+    parent_task_id: Optional[str] = None
+    pipeline_id: Optional[str] = None
+    tasks_root = config.TASKS_DIR.resolve()
+    for r in resolved:
+        try:
+            rp = Path(r["path"]).resolve()
+        except OSError:
+            continue
+        if tasks_root == rp or tasks_root not in rp.parents:
+            continue
+        tid_dir = rp.relative_to(tasks_root).parts[0]
+        parent = task_manager.load_task(tid_dir)
+        if parent is not None:
+            parent_task_id = tid_dir
+            pipeline_id = parent.data.get("pipeline_id") or tid_dir
+            break
+
     inputs = [
         task_manager.make_input_entry(r["path"], role=role, file_id=r["id"],
                                       filename=r["name"])
@@ -344,6 +362,7 @@ async def execute_tool_task(
         origin=origin, task_type=task_type, name=name, description=description,
         sdk_command=sdk_command, parameters=parameters, inputs=inputs,
         output_format=output_format,
+        parent_task_id=parent_task_id, pipeline_id=pipeline_id,
     )
 
     loop = asyncio.get_running_loop()

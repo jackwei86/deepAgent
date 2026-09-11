@@ -187,7 +187,7 @@ async function uploadFiles(fileList) {
 async function loadTaskOutputs() {
   const outputs = await api('/task-outputs');
   const c = document.getElementById('content');
-  document.getElementById('viewTitle').textContent = '任务产物 → 导入素材库';
+  document.getElementById('viewTitle').textContent = '任务产物 → 导入素材库 / 查看处理链';
   if (!outputs.length) { c.innerHTML = '<div class="empty">暂无任务产物</div>'; return; }
   c.innerHTML = '<div class="grid"></div>';
   const grid = c.querySelector('.grid');
@@ -197,10 +197,28 @@ async function loadTaskOutputs() {
     div.className = 'card';
     div.innerHTML = `<div class="thumb"><div class="icon">${kind === 'image' ? '🖼️' : '🎬'}</div></div>
       <div class="meta"><div class="name" title="${o.task_id}">${o.name}</div>
-      <div style="color:#888">${o.task_id}</div>
-      <div class="ops"><button onclick="importTask('${o.path.replace(/\\/g, '\\\\')}')">导入素材库</button></div></div>`;
+      <div style="color:#888">${o.task_id}${o.pipeline_id ? ` · 🔗链 ${o.pipeline_id}` : ''}</div>
+      <div class="ops">
+        <button onclick="importTask('${o.path.replace(/\\/g, '\\\\')}')">导入素材库</button>
+        <button onclick="showChain('${o.task_id}')">处理链</button>
+        <button onclick="importAndContinue('${o.path.replace(/\\/g, '\\\\')}', '${o.name}')">导入并继续处理</button>
+      </div></div>`;
     grid.appendChild(div);
   });
+}
+async function showChain(taskId) {
+  const chain = await api('/chain/' + taskId);
+  const c = document.getElementById('content');
+  const steps = chain.tasks.map(t =>
+    `<div style="margin:4px 0"><b>第${t.step}步</b> ${t.name || t.type} · ${t.status} · <code>${t.task_id}</code>
+     ${t.output_path ? `<div style="font-size:11px;color:#888">${t.output_path}</div>` : ''}</div>`)
+    .join('<div style="color:#3b82f6">↓ 派生 ↓</div>');
+  c.insertAdjacentHTML('afterbegin',
+    `<div class="card" style="padding:14px;margin-bottom:14px"><b>处理链 ${chain.pipeline_id}</b>（${chain.count} 步）${steps}</div>`);
+}
+async function importAndContinue(path, name) {
+  await importTask(path);
+  toast(`已导入素材库：${name}。到聊天页说 "处理素材库里的 ${name} ..." 即可从该结果继续处理`);
 }
 async function importTask(path) {
   const r = await api('/import-task', { method: 'POST',

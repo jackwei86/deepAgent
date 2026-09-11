@@ -64,7 +64,7 @@ def delete_file(path: str, user=Depends(_current_user())):
 
 @router.get("/task-outputs")
 def task_outputs(user=Depends(_current_user())):
-    """最近的任务产物（供一键导入素材库）。"""
+    """最近的任务产物（供一键导入素材库），附任务链关联字段。"""
     out = []
     for order in task_manager.list_tasks(limit=30):
         full = task_manager.load_task(order["task_id"])
@@ -75,8 +75,19 @@ def task_outputs(user=Depends(_current_user())):
         if p.is_file():
             out.append({"task_id": order["task_id"], "type": order["type"],
                         "status": order["status"], "name": p.name,
-                        "path": str(p), "size": p.stat().st_size})
+                        "path": str(p), "size": p.stat().st_size,
+                        "parent_task_id": full.data.get("parent_task_id"),
+                        "pipeline_id": full.data.get("pipeline_id")})
     return out
+
+
+@router.get("/chain/{task_id}")
+def chain(task_id: str, user=Depends(_current_user())):
+    """任务所在处理链（版本树）：按时间正序的链上任务列表。"""
+    c = task_manager.get_chain(task_id)
+    if c is None:
+        raise HTTPException(404, "任务不存在")
+    return c
 
 
 @router.post("/import-task")
