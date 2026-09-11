@@ -129,7 +129,8 @@ def probe_metadata(path: str | Path, timeout_s: float = 15.0) -> dict:
         proc = subprocess.run(
             [str(config.CV_EXE), "info", "--input", str(path)],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
-            env=config.CHILD_ENV_BASE, timeout=timeout_s,
+            env=config.CHILD_ENV_BASE, creationflags=config.CREATE_NO_WINDOW,
+            timeout=timeout_s,
         )
         for line in proc.stdout.splitlines():
             line = line.strip()

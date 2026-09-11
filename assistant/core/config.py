@@ -28,6 +28,9 @@ WEBUI_UPLOADS_DIR = WEBUI_DATA_DIR / "uploads"
 ENGINE_NAME = "cpp-sdk"
 ENGINE_VERSION = "1.0.0"
 
+# Windows 子进程不分配控制台窗口(托盘/无窗口宿主下防止黑框弹出)
+CREATE_NO_WINDOW = 0x08000000
+
 # 子进程环境: 抑制 OpenCV 的 INFO/WARN 日志噪音, 保证 stdout 只有 JSON-lines 协议
 CHILD_ENV_BASE = {**os.environ, "OPENCV_LOG_LEVEL": "ERROR"}
 

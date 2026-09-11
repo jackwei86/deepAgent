@@ -15,8 +15,9 @@ import pystray
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
-VENV_PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
+VENV_PYTHONW = ROOT / ".venv" / "Scripts" / "pythonw.exe"
 BASE_URL = "http://127.0.0.1:8080"
+CREATE_NO_WINDOW = 0x08000000  # 子进程不分配控制台(防黑框)
 
 _proc: subprocess.Popen | None = None
 
@@ -50,8 +51,10 @@ def start_service() -> None:
     if _port_in_use():
         # 8080 已有服务(例如手动启动的)在跑：托盘只做管理入口，不重复拉起
         return
-    _proc = subprocess.Popen([str(VENV_PYTHON), str(ROOT / "assistant" / "run_webui.py")],
+    # pythonw(无控制台) + CREATE_NO_WINDOW：双保险防止黑框
+    _proc = subprocess.Popen([str(VENV_PYTHONW), str(ROOT / "assistant" / "run_webui.py")],
                              cwd=str(ROOT), env=_child_env(),
+                             creationflags=CREATE_NO_WINDOW,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
