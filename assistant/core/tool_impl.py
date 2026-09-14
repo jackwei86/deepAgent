@@ -90,11 +90,22 @@ def resolve_message_files(files: Any) -> list[dict]:
     return resolved
 
 
+def _path_from_marker(text: str) -> Optional[str]:
+    """从文字占位中提取本机图片路径: "[用户上传的图片已保存: <path>，...]\""""
+    idx = text.find("图片已保存: ")
+    if idx == -1:
+        return None
+    rest = text[idx + len("图片已保存: "):].strip()
+    rest = rest.split("，")[0].split("]")[0].strip()
+    return rest or None
+
+
 def _extract_from_message_content(messages: Optional[list]) -> list[dict]:
     """最后一级回退：从用户消息的 content 内容部件(image_url)中提取图片。
 
     Open WebUI 发给模型前可能把附件转换为内容部件并剥离 files 字段。
-    支持 data: 内联与 /api/v1/files/<id>/content 两种 URL。
+    支持 data: 内联、/api/v1/files/<id>/content 引用，以及本过滤器
+    替换后的文字标记("[...图片已保存: <path>...]")三种形态。
     """
     resolved: list[dict] = []
     for msg in reversed(messages or []):
@@ -104,12 +115,18 @@ def _extract_from_message_content(messages: Optional[list]) -> list[dict]:
         if not isinstance(content, list):
             continue
         for part in content:
-            if not isinstance(part, dict) or part.get("type") != "image_url":
+            if not isinstance(part, dict):
                 continue
-            url = (part.get("image_url") or {}).get("url", "")
-            if not url:
-                continue
-            resolved.extend(resolve_message_files([{"url": url}]))
+            if part.get("type") == "image_url":
+                url = (part.get("image_url") or {}).get("url", "")
+                if url:
+                    resolved.extend(resolve_message_files([{"url": url}]))
+            elif part.get("type") == "text":
+                marker_path = _path_from_marker(part.get("text") or "")
+                if marker_path and Path(marker_path).is_file():
+                    resolved.append({"id": Path(marker_path).stem,
+                                     "name": Path(marker_path).name,
+                                     "path": marker_path})
         if resolved:
             break
     return resolved
@@ -117,19 +134,28 @@ def _extract_from_message_content(messages: Optional[list]) -> list[dict]:
 
 def _extract_first_user_image(messages: Optional[list]) -> Optional[dict]:
     """撤销到"最开始"用：取本轮对话第一张用户上传的图片（正序扫描，
-    依次尝试消息 files 字段与 content 图片部件）。"""
+    依次尝试消息 files 字段、content 图片部件与文字标记）。"""
     for msg in messages or []:
         if not isinstance(msg, dict) or msg.get("role") != "user":
             continue
         resolved = resolve_message_files(msg.get("files"))
         if not resolved and isinstance(msg.get("content"), list):
             for part in msg["content"]:
-                if not isinstance(part, dict) or part.get("type") != "image_url":
+                if not isinstance(part, dict):
                     continue
-                url = (part.get("image_url") or {}).get("url", "")
-                if url:
-                    resolved = resolve_message_files([{"url": url}])
-                    break
+                if part.get("type") == "image_url":
+                    url = (part.get("image_url") or {}).get("url", "")
+                    if url:
+                        resolved = resolve_message_files([{"url": url}])
+                        if resolved:
+                            break
+                elif part.get("type") == "text":
+                    marker_path = _path_from_marker(part.get("text") or "")
+                    if marker_path and Path(marker_path).is_file():
+                        resolved = [{"id": Path(marker_path).stem,
+                                     "name": Path(marker_path).name,
+                                     "path": marker_path}]
+                        break
         if resolved:
             return resolved[0]
     return None
