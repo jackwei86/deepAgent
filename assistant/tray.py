@@ -29,6 +29,13 @@ def _child_env() -> dict:
            "DEEPAGENT_MEDIA_DIR": str(ROOT / "media"),
            "HF_ENDPOINT": "https://hf-mirror.com",
            "OPENCV_LOG_LEVEL": "ERROR"}
+    # 剥离代理环境变量：aiohttp 不支持 socks5, 会导致服务内
+    # 模型列表/连接校验报 Connection error；DeepSeek/GLM/MiniMax
+    # 均为国内直连，无需代理
+    for k in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+              "http_proxy", "https_proxy", "all_proxy"):
+        env.pop(k, None)
+    env["NO_PROXY"] = "*"
     nvidia_bins = ROOT / ".venv" / "Lib" / "site-packages" / "nvidia"
     for sub in ("cublas", "cudnn"):
         p = nvidia_bins / sub / "bin"
@@ -52,10 +59,12 @@ def start_service() -> None:
         # 8080 已有服务(例如手动启动的)在跑：托盘只做管理入口，不重复拉起
         return
     # pythonw(无控制台) + CREATE_NO_WINDOW：双保险防止黑框
+    # 服务日志写入文件(排障必需)，托盘退出不杀日志
+    log_fh = open(ROOT / "data" / "webui_service.log", "ab")
     _proc = subprocess.Popen([str(VENV_PYTHONW), str(ROOT / "assistant" / "run_webui.py")],
                              cwd=str(ROOT), env=_child_env(),
                              creationflags=CREATE_NO_WINDOW,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=log_fh, stderr=log_fh)
 
 
 def stop_service() -> None:
