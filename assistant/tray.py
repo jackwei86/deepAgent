@@ -95,7 +95,7 @@ def main() -> None:
     start_service()
     menu = pystray.Menu(
         pystray.MenuItem("打开聊天界面", lambda: open_url("/"), default=True),
-        pystray.MenuItem("打开素材库", lambda: open_url("/media-ui/")),
+        pystray.MenuItem("打开素材库", lambda: open_url("/media-ui/?v=20260914")),
         pystray.MenuItem("重启服务", lambda: (stop_service(), start_service())),
         pystray.MenuItem("退出", on_quit),
     )
