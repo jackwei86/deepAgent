@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 
@@ -74,8 +75,30 @@ def stop_service() -> None:
         _proc = None
 
 
+def wait_service_ready(timeout_s: float = 180) -> bool:
+    """等服务真正可访问(启动约需 1-2 分钟)，避免浏览器打开时被拒绝连接。"""
+    import urllib.request
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(BASE_URL + "/health", timeout=2) as r:
+                if r.status == 200:
+                    return True
+        except Exception:
+            pass
+        time.sleep(1)
+    return False
+
+
 def open_url(path: str) -> None:
-    webbrowser.open(BASE_URL + path)
+    # 在独立线程等待+打开，避免卡住托盘菜单
+    threading.Thread(target=_open_when_ready, args=(path,), daemon=True).start()
+
+
+def _open_when_ready(path: str) -> None:
+    start_service()
+    if wait_service_ready():
+        webbrowser.open(BASE_URL + path)
 
 
 def make_icon() -> Image.Image:
