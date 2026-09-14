@@ -78,7 +78,7 @@ class Tools:
             restore_task_id=task_id.strip(),
             task_type="restore", name="撤销还原",
             description=f"撤销后续处理，还原到历史任务 {task_id} 的结果",
-            sdk_command="restore", parameters={}, inputs=[], output_format=None,
+            sdk_command="restore", parameters={}, output_format=None,
             input_roles=["source"], base_url=v.webui_base_url,
             llm_label=(v.llm_provider, v.llm_model), progress_label="撤销还原",
         )
