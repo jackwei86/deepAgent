@@ -7,26 +7,33 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f2430'/%3E%3Ctext x='32' y='44' font-size='36' text-anchor='middle'%3E%F0%9F%93%9A%3C/text%3E%3C/svg%3E">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f4f5f7; color: #222; display: flex; height: 100vh; }
-  .sidebar { width: 300px; background: #1f2430; color: #d8dbe2; display: flex; flex-direction: column; flex-shrink: 0; }
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f4f5f7; color: #222; display: flex; height: 100vh; overflow: hidden; }
+  /* ---------- 左侧栏 ---------- */
+  .sidebar { width: 280px; background: #1f2430; color: #d8dbe2; display: flex; flex-direction: column; flex-shrink: 0; }
   .sidebar h1 { font-size: 15px; padding: 14px 16px; color: #fff; border-bottom: 1px solid #2c3242; }
-  .tabs { display: flex; }
-  .tab { flex: 1; text-align: center; padding: 10px 0; cursor: pointer; background: #262c3a; font-size: 13px; }
-  .tab.active { background: #1f2430; color: #7ab8ff; border-bottom: 2px solid #7ab8ff; }
-  .panel { flex: 1; overflow-y: auto; padding: 10px 6px; display: none; }
-  .panel.active { display: block; }
+  .tree-wrap { flex: 1; overflow-y: auto; padding: 10px 6px; }
   .tree-dir { margin: 2px 0; }
   .tree-label { padding: 5px 8px; cursor: pointer; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
   .tree-label:hover { background: #2c3242; }
   .tree-children { margin-left: 16px; }
   .tree-file { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; border-radius: 6px; font-size: 12.5px; color: #aab3c5; }
   .tree-file:hover { background: #2c3242; color: #fff; }
-  .dropzone { border: 2px dashed #4a5266; border-radius: 8px; padding: 14px; text-align: center; font-size: 12.5px; color: #8a93a6; margin: 8px 10px; cursor: pointer; }
-  .dropzone.drag { border-color: #7ab8ff; color: #7ab8ff; }
+  /* ---------- 底部分类入口 ---------- */
+  .nav { border-top: 1px solid #2c3242; padding: 8px 6px; display: flex; flex-direction: column; gap: 4px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 13.5px; color: #aab3c5; border: none; background: none; text-align: left; width: 100%; }
+  .nav-item:hover { background: #2c3242; color: #fff; }
+  .nav-item.active { background: #31405c; color: #fff; }
+  /* ---------- 右侧主区域 ---------- */
   main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .toolbar { padding: 10px 18px; background: #fff; border-bottom: 1px solid #e3e5ea; display: flex; align-items: center; gap: 8px; }
+  .toolbar { padding: 10px 18px; background: #fff; border-bottom: 1px solid #e3e5ea; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .toolbar .title { font-size: 15px; font-weight: 600; margin-right: auto; }
+  .btn { display: inline-block; background: #3b82f6; color: #fff; border: none; border-radius: 6px; padding: 7px 12px; cursor: pointer; font-size: 13px; margin: 2px; text-decoration: none; }
+  .btn:hover { background: #2f6fe0; }
+  .btn.gray { background: #6b7488; }
+  .btn.gray:hover { background: #5a6376; }
   .content { flex: 1; overflow-y: auto; padding: 18px; }
+  .content.drag { outline: 2px dashed #3b82f6; outline-offset: -10px; }
+  .drop-hint { border: 2px dashed #b9c0cc; border-radius: 10px; padding: 10px; text-align: center; font-size: 12.5px; color: #8a93a6; margin-bottom: 14px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
   .card { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
   .card .thumb { height: 120px; background: #eceef2; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
@@ -34,16 +41,17 @@
   .card .thumb .icon { font-size: 34px; }
   .card .meta { padding: 8px 10px; font-size: 12px; }
   .card .meta .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
-  .card .meta .ops { margin-top: 6px; display: flex; gap: 6px; }
+  .card .meta .ops { margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
   .card .meta .ops a, .card .meta .ops button { font-size: 11.5px; color: #3b82f6; text-decoration: none; background: none; border: none; cursor: pointer; padding: 0; }
   .card .meta .ops button.del { color: #b3453f; }
   .empty { color: #98a0ae; text-align: center; margin-top: 60px; font-size: 14px; }
-  .doc h3 { margin: 18px 0 6px; font-size: 15px; }
-  .doc p { font-size: 13px; color: #444; margin: 4px 0; line-height: 1.6; }
-  table { border-collapse: collapse; width: 100%; margin: 6px 0 14px; background: #fff; font-size: 12.5px; }
-  th, td { border: 1px solid #e3e5ea; padding: 6px 9px; text-align: left; }
-  th { background: #f0f2f5; }
-  code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  /* ---------- 工具说明(主区域全宽) ---------- */
+  .doc h3 { margin: 18px 0 6px; font-size: 16px; }
+  .doc p { font-size: 13.5px; color: #444; margin: 6px 0; line-height: 1.7; }
+  .doc table { border-collapse: collapse; width: 100%; margin: 8px 0 18px; background: #fff; font-size: 13px; }
+  .doc th, .doc td { border: 1px solid #e3e5ea; padding: 7px 10px; text-align: left; }
+  .doc th { background: #f0f2f5; }
+  .doc code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
   #lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 50; cursor: zoom-out; }
   #lightbox img, #lightbox video { max-width: 92%; max-height: 92%; border-radius: 8px; }
   .toast { position: fixed; top: 16px; right: 16px; background: #222; color: #fff; padding: 9px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .25s; z-index: 60; }
@@ -52,24 +60,22 @@
 </head>
 <body>
   <div class="sidebar">
-    <h1>📚 DeepAgent 素材库</h1>
-    <div class="tabs">
-      <div class="tab active" data-tab="media">素材库</div>
-      <div class="tab" data-tab="docs">工具说明</div>
+    <h1>📚 DeepAgent</h1>
+    <div class="tree-wrap" id="tree"></div>
+    <div class="nav">
+      <button class="nav-item active" data-view="media" onclick="switchView('media')">🖼️ 素材库</button>
+      <button class="nav-item" data-view="docs" onclick="switchView('docs')">🛠️ 工具说明</button>
     </div>
-    <div class="panel active" id="panel-media">
-      <div class="dropzone" id="dropzone">拖拽图片/视频到此上传<br>或点击选择文件（自动分类到 image / video）</div>
-      <input type="file" id="fileInput" multiple accept="image/*,video/*" hidden>
-      <div id="tree"></div>
-    </div>
-    <div class="panel" id="panel-docs"><div id="docs" style="color:#aab3c5; font-size:12.5px; padding:6px;">加载中…</div></div>
   </div>
   <main>
     <div class="toolbar">
-      <div class="title" id="viewTitle">全部素材</div>
-      <button class="btn gray" onclick="loadTaskOutputs()">从任务产物导入</button>
-      <button class="btn gray" onclick="location.reload()">刷新</button>
+      <button class="btn gray" onclick="goBack()" title="返回之前的页面">← 返回</button>
+      <div class="title" id="viewTitle">素材库</div>
+      <button class="btn" onclick="document.getElementById('fileInput').click()">＋ 添加素材</button>
+      <button class="btn gray" onclick="loadTaskOutputs()">任务产物导入</button>
+      <button class="btn gray" onclick="loadTree()">刷新</button>
     </div>
+    <input type="file" id="fileInput" multiple accept="image/*,video/*" hidden>
     <div class="content" id="content"><div class="empty">加载中…</div></div>
   </main>
   <div id="lightbox" onclick="this.style.display='none'"></div>
@@ -82,7 +88,7 @@ const TOKEN = localStorage.getItem('token') || '';
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
+  setTimeout(() => t.classList.remove('show'), 2600);
 }
 async function api(path, options = {}) {
   const resp = await fetch(API + path, {
@@ -90,12 +96,22 @@ async function api(path, options = {}) {
     headers: { Authorization: 'Bearer ' + TOKEN, ...(options.headers || {}) },
   });
   if (resp.status === 401) { document.getElementById('content').innerHTML =
-    '<div class="empty">未检测到登录态：请先在 <a href="/" target="_blank">聊天首页</a> 登录，<br>然后刷新本页。</div>';
+    '<div class="empty">未检测到登录态：请先在 <a href="/" target="_self">聊天首页</a> 登录后刷新本页。</div>';
     throw new Error('unauthorized'); }
   if (!resp.ok) throw new Error((await resp.text()).slice(0, 200));
   return resp.json();
 }
 
+// ---------- 视图切换(侧边栏底部分类) ----------
+function switchView(view) {
+  document.querySelectorAll('.nav-item').forEach(x =>
+    x.classList.toggle('active', x.dataset.view === view));
+  document.getElementById('tree').style.display = view === 'media' ? '' : 'none';
+  if (view === 'docs') loadDocs();
+  else loadTree();
+}
+
+// ---------- 素材树 ----------
 async function loadTree() {
   const tree = await api('/tree');
   const el = document.getElementById('tree');
@@ -118,7 +134,6 @@ function renderDir(node, isRoot) {
     else {
       const f = document.createElement('div');
       f.className = 'tree-file';
-      f.dataset.path = child.rel_path;
       f.innerHTML = (child.kind === 'image' ? '🖼️' : '🎬') + ` <span>${child.name}</span><span style="margin-left:auto;font-size:11px;color:#6c7689">${fmt(child.size)}</span>`;
       f.onclick = () => preview(child.rel_path, child.kind === 'image');
       kids.appendChild(f);
@@ -140,10 +155,11 @@ function collect(node) {
 }
 function renderGrid(files) {
   const c = document.getElementById('content');
-  if (!files.length) { c.innerHTML = '<div class="empty">空空如也——拖拽图片/视频到左侧上传，或从任务产物导入</div>'; return; }
-  c.innerHTML = '<div class="grid"></div>';
+  c.innerHTML = '<div class="drop-hint">将本地图片/视频拖入本页面任意位置，或点上方「＋ 添加素材」上传（自动分类到 image / video）</div>'
+    + (files.length ? '<div class="grid"></div>' : '<div class="empty">暂无素材</div>');
   const grid = c.querySelector('.grid');
   files.forEach(f => grid.appendChild(card(f)));
+  bindDrop(c);
 }
 function card(f) {
   const div = document.createElement('div');
@@ -169,12 +185,15 @@ async function delFile(rel) {
   toast('已删除'); loadTree();
 }
 
-const dz = document.getElementById('dropzone');
-dz.onclick = () => document.getElementById('fileInput').click();
+// ---------- 上传(按钮 + 全页拖拽) ----------
 document.getElementById('fileInput').onchange = e => uploadFiles(e.target.files);
-dz.ondragover = e => { e.preventDefault(); dz.classList.add('drag'); };
-dz.ondragleave = () => dz.classList.remove('drag');
-dz.ondrop = e => { e.preventDefault(); dz.classList.remove('drag'); uploadFiles(e.dataTransfer.files); };
+const content = document.getElementById('content');
+content.addEventListener('dragover', e => { e.preventDefault(); content.classList.add('drag'); });
+content.addEventListener('dragleave', () => content.classList.remove('drag'));
+content.addEventListener('drop', e => {
+  e.preventDefault(); content.classList.remove('drag');
+  if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
+});
 async function uploadFiles(fileList) {
   if (!fileList || !fileList.length) return;
   const fd = new FormData();
@@ -184,10 +203,11 @@ async function uploadFiles(fileList) {
   loadTree();
 }
 
+// ---------- 任务产物导入 ----------
 async function loadTaskOutputs() {
   const outputs = await api('/task-outputs');
-  const c = document.getElementById('content');
   document.getElementById('viewTitle').textContent = '任务产物 → 导入素材库 / 查看处理链';
+  const c = document.getElementById('content');
   if (!outputs.length) { c.innerHTML = '<div class="empty">暂无任务产物</div>'; return; }
   c.innerHTML = '<div class="grid"></div>';
   const grid = c.querySelector('.grid');
@@ -206,6 +226,15 @@ async function loadTaskOutputs() {
     grid.appendChild(div);
   });
 }
+async function importTask(path) {
+  const r = await api('/import-task', { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) });
+  toast('已导入素材库：' + r.rel_path); loadTree();
+}
+async function importAndContinue(path, name) {
+  await importTask(path);
+  toast(`已导入素材库：${name}。到聊天页说 "处理素材库里的 ${name} ..." 即可从该结果继续处理`);
+}
 async function showChain(taskId) {
   const chain = await api('/chain/' + taskId);
   const c = document.getElementById('content');
@@ -216,39 +245,28 @@ async function showChain(taskId) {
   c.insertAdjacentHTML('afterbegin',
     `<div class="card" style="padding:14px;margin-bottom:14px"><b>处理链 ${chain.pipeline_id}</b>（${chain.count} 步）${steps}</div>`);
 }
-async function importAndContinue(path, name) {
-  await importTask(path);
-  toast(`已导入素材库：${name}。到聊天页说 "处理素材库里的 ${name} ..." 即可从该结果继续处理`);
-}
-async function importTask(path) {
-  const r = await api('/import-task', { method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) });
-  toast('已导入素材库：' + r.rel_path); loadTree();
-}
 
+// ---------- 工具说明(主区域全宽) ----------
 async function loadDocs() {
   const docs = await api('/tool-docs');
-  const el = document.getElementById('docs');
-  el.style.color = '#d8dbe2'; el.style.fontSize = '13px';
-  el.innerHTML = docs.map(tool => `
-    <div class="doc">
-      <h3>${tool.name} <code style="background:#31405c;color:#9cc3ff">${tool.id}</code></h3>
-      ${tool.functions.map(fn => `
-        <p>${(fn.description || '').replace(/\n/g, '<br>')}</p>
-        ${fn.parameters.length ? `<table><tr><th>参数</th><th>类型</th><th>默认</th><th>说明</th></tr>
-          ${fn.parameters.map(p => `<tr><td><code>${p.name}</code></td><td>${p.type}</td>
-          <td>${p.default ?? '—'}</td><td>${p.description || ''}</td></tr>`).join('')}</table>`
-          : '<p><i>无参数</i></p>'}`).join('')}
-    </div>`).join('');
+  document.getElementById('viewTitle').textContent = '工具说明';
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="doc">' + docs.map(tool => `
+    <h3>${tool.name} <code>${tool.id}</code></h3>
+    ${tool.functions.map(fn => `
+      <p>${(fn.description || '').replace(/\n/g, '<br>')}</p>
+      ${fn.parameters.length ? `<table><tr><th>参数</th><th>类型</th><th>默认</th><th>说明</th></tr>
+        ${fn.parameters.map(p => `<tr><td><code>${p.name}</code></td><td>${p.type}</td>
+        <td>${p.default ?? '—'}</td><td>${p.description || ''}</td></tr>`).join('')}</table>`
+        : '<p><i>无参数</i></p>'}`).join('')}
+  </div>`).join('');
 }
 
-document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-  document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
-  document.getElementById('panel-' + t.dataset.tab).classList.add('active');
-  if (t.dataset.tab === 'docs') loadDocs();
-});
+// ---------- 返回 ----------
+function goBack() {
+  if (history.length > 1) history.back();
+  else location.href = '/';
+}
 
 function fmt(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + 'M' : n > 1024 ? (n / 1024).toFixed(0) + 'K' : n + 'B'; }
 loadTree().catch(e => console.warn(e));
