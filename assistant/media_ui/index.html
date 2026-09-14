@@ -6,57 +6,73 @@
 <meta http-equiv="Cache-Control" content="no-store">
 <title>DeepAgent 素材库与工具说明</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231f2430'/%3E%3Ctext x='32' y='44' font-size='36' text-anchor='middle'%3E%F0%9F%93%9A%3C/text%3E%3C/svg%3E">
+<script>
+/* 主题跟随聊天页(同源共享 localStorage 的 theme 设置) */
+(function () {
+  var t = null;
+  try { t = localStorage.getItem('theme'); } catch (e) {}
+  var dark = t === 'dark' || t === 'oled' ||
+    ((t === 'system' || !t) && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+})();
+</script>
 <style>
+  :root, html[data-theme="light"] {
+    --bg: #f4f4f5; --side: #f9fafb; --text: #1a1a1e; --muted: #6b7280;
+    --card: #ffffff; --border: #e5e7eb; --hover: #f3f4f6; --accent: #3b82f6;
+  }
+  html[data-theme="dark"] {
+    --bg: #09090b; --side: #131316; --text: #e5e7eb; --muted: #9ca3af;
+    --card: #1a1a1e; --border: rgba(255,255,255,.08); --hover: rgba(255,255,255,.06);
+    --accent: #60a5fa;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f4f5f7; color: #222; display: flex; height: 100vh; overflow: hidden; }
-  /* ---------- 左侧栏 ---------- */
-  .sidebar { width: 280px; background: #1f2430; color: #d8dbe2; display: flex; flex-direction: column; flex-shrink: 0; }
-  .sidebar h1 { font-size: 15px; padding: 14px 16px; color: #fff; border-bottom: 1px solid #2c3242; }
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 280px; background: var(--side); display: flex; flex-direction: column; flex-shrink: 0; border-right: 1px solid var(--border); }
+  .sidebar h1 { font-size: 15px; padding: 14px 16px; color: var(--text); border-bottom: 1px solid var(--border); }
   .tree-wrap { flex: 1; overflow-y: auto; padding: 10px 6px; }
   .tree-dir { margin: 2px 0; }
-  .tree-label { padding: 5px 8px; cursor: pointer; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
-  .tree-label:hover { background: #2c3242; }
+  .tree-label { padding: 5px 8px; cursor: pointer; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 6px; color: var(--text); }
+  .tree-label:hover { background: var(--hover); }
   .tree-children { margin-left: 16px; }
-  .tree-file { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; border-radius: 6px; font-size: 12.5px; color: #aab3c5; }
-  .tree-file:hover { background: #2c3242; color: #fff; }
-  /* ---------- 右侧主区域 ---------- */
+  .tree-file { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; border-radius: 6px; font-size: 12.5px; color: var(--muted); }
+  .tree-file:hover { background: var(--hover); color: var(--text); }
   main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .toolbar { padding: 10px 18px; background: #fff; border-bottom: 1px solid #e3e5ea; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .toolbar { padding: 10px 18px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .toolbar .title { font-size: 15px; font-weight: 600; margin-right: auto; }
-  .btn { display: inline-block; background: #3b82f6; color: #fff; border: none; border-radius: 6px; padding: 7px 12px; cursor: pointer; font-size: 13px; margin: 2px; text-decoration: none; }
-  .btn:hover { background: #2f6fe0; }
-  .btn.gray { background: #6b7488; }
-  .btn.gray:hover { background: #5a6376; }
+  .btn { display: inline-block; background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 7px 12px; cursor: pointer; font-size: 13px; margin: 2px; text-decoration: none; }
+  .btn:hover { opacity: .88; }
+  .btn.gray { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn.gray:hover { background: var(--hover); }
   .content { flex: 1; overflow-y: auto; padding: 18px; }
-  .content.drag { outline: 2px dashed #3b82f6; outline-offset: -10px; }
-  .drop-hint { border: 2px dashed #b9c0cc; border-radius: 10px; padding: 10px; text-align: center; font-size: 12.5px; color: #8a93a6; margin-bottom: 14px; }
+  .content.drag { outline: 2px dashed var(--accent); outline-offset: -10px; }
+  .drop-hint { border: 2px dashed var(--border); border-radius: 10px; padding: 10px; text-align: center; font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
-  .card { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-  .card .thumb { height: 120px; background: #eceef2; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .card .thumb { height: 120px; background: var(--hover); display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
   .card .thumb img { width: 100%; height: 100%; object-fit: cover; }
   .card .thumb .icon { font-size: 34px; }
   .card .meta { padding: 8px 10px; font-size: 12px; }
   .card .meta .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
   .card .meta .ops { margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .card .meta .ops a, .card .meta .ops button { font-size: 11.5px; color: #3b82f6; text-decoration: none; background: none; border: none; cursor: pointer; padding: 0; }
-  .card .meta .ops button.del { color: #b3453f; }
-  .empty { color: #98a0ae; text-align: center; margin-top: 60px; font-size: 14px; }
-  /* ---------- 工具说明(主区域全宽) ---------- */
+  .card .meta .ops a, .card .meta .ops button { font-size: 11.5px; color: var(--accent); text-decoration: none; background: none; border: none; cursor: pointer; padding: 0; }
+  .card .meta .ops button.del { color: #ef6b64; }
+  .empty { color: var(--muted); text-align: center; margin-top: 60px; font-size: 14px; }
   .doc h3 { margin: 18px 0 6px; font-size: 16px; }
-  .doc p { font-size: 13.5px; color: #444; margin: 6px 0; line-height: 1.7; }
-  .doc table { border-collapse: collapse; width: 100%; margin: 8px 0 18px; background: #fff; font-size: 13px; }
-  .doc th, .doc td { border: 1px solid #e3e5ea; padding: 7px 10px; text-align: left; }
-  .doc th { background: #f0f2f5; }
-  .doc code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
-  #lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 50; cursor: zoom-out; }
+  .doc p { font-size: 13.5px; color: var(--text); opacity: .92; margin: 6px 0; line-height: 1.7; }
+  .doc table { border-collapse: collapse; width: 100%; margin: 8px 0 18px; background: var(--card); font-size: 13px; }
+  .doc th, .doc td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; }
+  .doc th { background: var(--hover); }
+  .doc code { background: var(--hover); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  #lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.78); display: none; align-items: center; justify-content: center; z-index: 50; cursor: zoom-out; }
   #lightbox img, #lightbox video { max-width: 92%; max-height: 92%; border-radius: 8px; }
-  .toast { position: fixed; top: 16px; right: 16px; background: #222; color: #fff; padding: 9px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .25s; z-index: 60; }
-  .toast.show { opacity: .92; }
+  .toast { position: fixed; top: 16px; right: 16px; background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 9px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .25s; z-index: 60; }
+  .toast.show { opacity: .96; }
 </style>
 </head>
 <body>
   <div class="sidebar">
-    <h1>📚 DeepAgent</h1>
+    <h1>📚 DeepAgent 素材库</h1>
     <div class="tree-wrap" id="tree"></div>
   </div>
   <main>
@@ -94,14 +110,12 @@ async function api(path, options = {}) {
   return resp.json();
 }
 
-// ---------- 视图切换(侧边栏底部分类) ----------
 function switchView(view) {
   document.getElementById('tree').style.display = view === 'media' ? '' : 'none';
   if (view === 'docs') loadDocs();
   else loadTree();
 }
 
-// ---------- 素材树 ----------
 async function loadTree() {
   const tree = await api('/tree');
   const el = document.getElementById('tree');
@@ -124,7 +138,7 @@ function renderDir(node, isRoot) {
     else {
       const f = document.createElement('div');
       f.className = 'tree-file';
-      f.innerHTML = (child.kind === 'image' ? '🖼️' : '🎬') + ` <span>${child.name}</span><span style="margin-left:auto;font-size:11px;color:#6c7689">${fmt(child.size)}</span>`;
+      f.innerHTML = (child.kind === 'image' ? '🖼️' : '🎬') + ` <span>${child.name}</span><span style="margin-left:auto;font-size:11px;color:var(--muted)">${fmt(child.size)}</span>`;
       f.onclick = () => preview(child.rel_path, child.kind === 'image');
       kids.appendChild(f);
     }
@@ -175,7 +189,6 @@ async function delFile(rel) {
   toast('已删除'); loadTree();
 }
 
-// ---------- 上传(按钮 + 全页拖拽) ----------
 document.getElementById('fileInput').onchange = e => uploadFiles(e.target.files);
 const content = document.getElementById('content');
 content.addEventListener('dragover', e => { e.preventDefault(); content.classList.add('drag'); });
@@ -193,7 +206,6 @@ async function uploadFiles(fileList) {
   loadTree();
 }
 
-// ---------- 任务产物导入 ----------
 async function loadTaskOutputs() {
   const outputs = await api('/task-outputs');
   document.getElementById('viewTitle').textContent = '任务产物 → 导入素材库 / 查看处理链';
@@ -207,7 +219,7 @@ async function loadTaskOutputs() {
     div.className = 'card';
     div.innerHTML = `<div class="thumb"><div class="icon">${kind === 'image' ? '🖼️' : '🎬'}</div></div>
       <div class="meta"><div class="name" title="${o.task_id}">${o.name}</div>
-      <div style="color:#888">${o.task_id}${o.pipeline_id ? ` · 🔗链 ${o.pipeline_id}` : ''}</div>
+      <div style="color:var(--muted)">${o.task_id}${o.pipeline_id ? ` · 🔗链 ${o.pipeline_id}` : ''}</div>
       <div class="ops">
         <button onclick="importTask('${o.path.replace(/\\/g, '\\\\')}')">导入素材库</button>
         <button onclick="showChain('${o.task_id}')">处理链</button>
@@ -230,13 +242,12 @@ async function showChain(taskId) {
   const c = document.getElementById('content');
   const steps = chain.tasks.map(t =>
     `<div style="margin:4px 0"><b>第${t.step}步</b> ${t.name || t.type} · ${t.status} · <code>${t.task_id}</code>
-     ${t.output_path ? `<div style="font-size:11px;color:#888">${t.output_path}</div>` : ''}</div>`)
-    .join('<div style="color:#3b82f6">↓ 派生 ↓</div>');
+     ${t.output_path ? `<div style="font-size:11px;color:var(--muted)">${t.output_path}</div>` : ''}</div>`)
+    .join('<div style="color:var(--accent)">↓ 派生 ↓</div>');
   c.insertAdjacentHTML('afterbegin',
     `<div class="card" style="padding:14px;margin-bottom:14px"><b>处理链 ${chain.pipeline_id}</b>（${chain.count} 步）${steps}</div>`);
 }
 
-// ---------- 工具说明(主区域全宽) ----------
 async function loadDocs() {
   const docs = await api('/tool-docs');
   document.getElementById('viewTitle').textContent = '工具说明';
@@ -252,7 +263,6 @@ async function loadDocs() {
   </div>`).join('');
 }
 
-// ---------- 返回 ----------
 function goBack() {
   if (history.length > 1) history.back();
   else location.href = '/';
