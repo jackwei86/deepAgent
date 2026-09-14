@@ -115,6 +115,26 @@ def _extract_from_message_content(messages: Optional[list]) -> list[dict]:
     return resolved
 
 
+def _extract_first_user_image(messages: Optional[list]) -> Optional[dict]:
+    """撤销到"最开始"用：取本轮对话第一张用户上传的图片（正序扫描，
+    依次尝试消息 files 字段与 content 图片部件）。"""
+    for msg in messages or []:
+        if not isinstance(msg, dict) or msg.get("role") != "user":
+            continue
+        resolved = resolve_message_files(msg.get("files"))
+        if not resolved and isinstance(msg.get("content"), list):
+            for part in msg["content"]:
+                if not isinstance(part, dict) or part.get("type") != "image_url":
+                    continue
+                url = (part.get("image_url") or {}).get("url", "")
+                if url:
+                    resolved = resolve_message_files([{"url": url}])
+                    break
+        if resolved:
+            return resolved[0]
+    return None
+
+
 def _log_payload(files: Any, messages: Optional[list], resolved: list) -> None:
     """记录工具实际收到的载荷摘要(诊断用)，追加到 data/debug_tool_payload.log。"""
     try:
@@ -305,6 +325,14 @@ async def execute_tool_task(
         output_format = rp.suffix.lstrip(".").lower() or "jpg"
         parent_task_id = restore_task_id
         pipeline_id = target.data.get("pipeline_id") or restore_task_id
+    elif task_type == "restore" and not restore_task_id:
+        # 撤销到"最开始": 还原本轮对话第一张用户上传的原图(无任务单的原始素材)
+        first = _extract_first_user_image(messages)
+        if first:
+            resolved = [first]
+            output_format = Path(first["path"]).suffix.lstrip(".").lower() or "jpg"
+            parent_task_id = None
+            pipeline_id = None
     if not resolved:
         resolved = resolve_message_files(files)
     if not resolved:
