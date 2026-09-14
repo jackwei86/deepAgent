@@ -19,11 +19,6 @@
   .tree-children { margin-left: 16px; }
   .tree-file { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; border-radius: 6px; font-size: 12.5px; color: #aab3c5; }
   .tree-file:hover { background: #2c3242; color: #fff; }
-  /* ---------- 底部分类入口 ---------- */
-  .nav { border-top: 1px solid #2c3242; padding: 8px 6px; display: flex; flex-direction: column; gap: 4px; }
-  .nav-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 13.5px; color: #aab3c5; border: none; background: none; text-align: left; width: 100%; }
-  .nav-item:hover { background: #2c3242; color: #fff; }
-  .nav-item.active { background: #31405c; color: #fff; }
   /* ---------- 右侧主区域 ---------- */
   main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
   .toolbar { padding: 10px 18px; background: #fff; border-bottom: 1px solid #e3e5ea; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -63,10 +58,6 @@
   <div class="sidebar">
     <h1>📚 DeepAgent</h1>
     <div class="tree-wrap" id="tree"></div>
-    <div class="nav">
-      <button class="nav-item active" data-view="media" onclick="switchView('media')">🖼️ 素材库</button>
-      <button class="nav-item" data-view="docs" onclick="switchView('docs')">🛠️ 工具说明</button>
-    </div>
   </div>
   <main>
     <div class="toolbar">
@@ -105,8 +96,6 @@ async function api(path, options = {}) {
 
 // ---------- 视图切换(侧边栏底部分类) ----------
 function switchView(view) {
-  document.querySelectorAll('.nav-item').forEach(x =>
-    x.classList.toggle('active', x.dataset.view === view));
   document.getElementById('tree').style.display = view === 'media' ? '' : 'none';
   if (view === 'docs') loadDocs();
   else loadTree();
@@ -270,7 +259,8 @@ function goBack() {
 }
 
 function fmt(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + 'M' : n > 1024 ? (n / 1024).toFixed(0) + 'K' : n + 'B'; }
-loadTree().catch(e => console.warn(e));
+const _params = new URLSearchParams(location.search);
+switchView(_params.get('docs') === '1' ? 'docs' : 'media');
 </script>
 </body>
 </html>
