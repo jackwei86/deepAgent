@@ -38,11 +38,23 @@ def main() -> None:
     # 后注册的路由永远不会命中。先注册素材库路由与页面，
     # 再把所有 SPA 兜底 Mount(path 为 "" 或 "/")挪到路由表最末尾。
     open_webui_app.include_router(router, prefix="/media/api")
-    open_webui_app.mount(
-        "/media-ui",
-        StaticFiles(directory=str(ROOT / "assistant" / "media_ui"), html=True),
-        name="media-ui",
-    )
+
+    # 素材库页面: 强制 no-store，保证更新后浏览器刷新即见新版
+    from fastapi.responses import FileResponse
+    from fastapi import HTTPException
+    media_ui_dir = (ROOT / "assistant" / "media_ui").resolve()
+
+    @open_webui_app.get("/media-ui", include_in_schema=False)
+    @open_webui_app.get("/media-ui/{path:path}", include_in_schema=False)
+    def media_ui_page(path: str = "index.html"):
+        target = (media_ui_dir / path).resolve()
+        if media_ui_dir != target and media_ui_dir not in target.parents:
+            raise HTTPException(404)
+        if target.is_dir():
+            target = target / "index.html"
+        if not target.is_file():
+            raise HTTPException(404)
+        return FileResponse(target, headers={"Cache-Control": "no-store, must-revalidate"})
 
     for route in [r for r in open_webui_app.routes
                   if type(r).__name__ == "Mount" and getattr(r, "path", None) in ("", "/")]:
