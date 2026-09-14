@@ -74,15 +74,14 @@ class Tools:
         :param task_id: 要还原到的历史任务单编号；留空 = 还原到最开始(原始上传图)。来自之前工具结果中的"任务单"信息。
         """
         v = getattr(self, "valves", None) or self.Valves()
-        if not task_id:
-            return ("⚠️ 缺少要还原到的历史任务编号。请从本轮对话此前的工具结果中找到"
-                    "\"任务单：`编号`\"，把编号作为 task_id 传入。")
+        # task_id 留空 = 还原到最开始(原图)，由 execute_tool_task 的原图回退逻辑处理
         return await tool_impl.execute_tool_task(
             event_emitter=__event_emitter__, request=__request__, files=__files__,
             messages=__messages__, user=__user__,
             restore_task_id=task_id.strip(),
             task_type="restore", name="撤销还原",
-            description=f"撤销后续处理，还原到历史任务 {task_id} 的结果",
+            description=(f"撤销后续处理，还原到历史任务 {task_id} 的结果"
+                         if task_id else "撤销所有处理，还原到最初上传的原图"),
             sdk_command="restore", parameters={}, output_format=None,
             input_roles=["source"], base_url=v.webui_base_url,
             llm_label=(v.llm_provider, v.llm_model), progress_label="撤销还原",
