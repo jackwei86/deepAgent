@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/png" href="/static/favicon.png" crossorigin="use-credentials" />
+		<link
+			rel="icon"
+			type="image/png"
+			href="/static/favicon-96x96.png"
+			sizes="96x96"
+			crossorigin="use-credentials"
+		/>
+		<link
+			rel="icon"
+			type="image/svg+xml"
+			href="/static/favicon.svg"
+			crossorigin="use-credentials"
+		/>
+		<link rel="shortcut icon" href="/static/favicon.ico" crossorigin="use-credentials" />
+		<link
+			rel="apple-touch-icon"
+			sizes="180x180"
+			href="/static/apple-touch-icon.png"
+			crossorigin="use-credentials"
+		/>
+		<link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+		/>
+		<meta name="theme-color" content="#171717" />
+		<meta name="robots" content="noindex,nofollow" />
+
+		<script src="/static/loader.js" defer crossorigin="use-credentials"></script>
+		<link rel="stylesheet" href="/static/custom.css" crossorigin="use-credentials" />
+
+		<script>
+			function resizeIframe(obj) {
+				obj.style.height = obj.contentWindow.document.documentElement.scrollHeight + 'px';
+			}
+		</script>
+
+		<script>
+			// On page load or when changing themes, best to add inline in `head` to avoid FOUC
+			(() => {
+				const metaThemeColorTag = document.querySelector('meta[name="theme-color"]');
+				const prefersDarkTheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+				if (!localStorage?.theme) {
+					localStorage.theme = 'system';
+				}
+
+				if (localStorage.theme === 'system') {
+					document.documentElement.classList.add(prefersDarkTheme ? 'dark' : 'light');
+					metaThemeColorTag.setAttribute('content', prefersDarkTheme ? '#171717' : '#ffffff');
+				} else if (localStorage.theme === 'oled-dark') {
+					document.documentElement.style.setProperty('--color-gray-800', '#101010');
+					document.documentElement.style.setProperty('--color-gray-850', '#050505');
+					document.documentElement.style.setProperty('--color-gray-900', '#000000');
+					document.documentElement.style.setProperty('--color-gray-950', '#000000');
+					document.documentElement.classList.add('dark');
+					metaThemeColorTag.setAttribute('content', '#000000');
+				} else if (localStorage.theme === 'light') {
+					document.documentElement.classList.add('light');
+					metaThemeColorTag.setAttribute('content', '#ffffff');
+				} else if (localStorage.theme === 'her') {
+					document.documentElement.classList.add('her');
+					metaThemeColorTag.setAttribute('content', '#983724');
+				} else {
+					document.documentElement.classList.add('dark');
+					metaThemeColorTag.setAttribute('content', '#171717');
+				}
+
+				window.matchMedia('(prefers-color-scheme: dark)').addListener((e) => {
+					if (localStorage.theme === 'system') {
+						if (e.matches) {
+							document.documentElement.classList.add('dark');
+							document.documentElement.classList.remove('light');
+							metaThemeColorTag.setAttribute('content', '#171717');
+						} else {
+							document.documentElement.classList.add('light');
+							document.documentElement.classList.remove('dark');
+							metaThemeColorTag.setAttribute('content', '#ffffff');
+						}
+					}
+				});
+				const isDarkMode = document.documentElement.classList.contains('dark');
+
+				const logo = document.createElement('img');
+				logo.id = 'logo';
+				logo.style =
+					'position: absolute; width: auto; height: 6rem; top: 44%; left: 50%; transform: translateX(-50%); display:block;';
+				logo.src = isDarkMode ? '/static/splash-dark.png' : '/static/splash.png';
+
+				document.addEventListener('DOMContentLoaded', function () {
+					const splash = document.getElementById('splash-screen');
+					if (document.documentElement.classList.contains('her')) {
+						return;
+					}
+
+					if (splash) splash.prepend(logo);
+				});
+			})();
+		</script>
+
+		<title>Open WebUI</title>
+
+		
+		<link rel="modulepreload" href="/_app/immutable/entry/start.BMeVZFj3.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/CSKGYGI6.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/lUdQH9Xf.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/D-dubyUK.js">
+		<link rel="modulepreload" href="/_app/immutable/entry/app.BDMrXeaZ.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/C1FmrZbK.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/BI6F0m6s.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/CWj6FrbW.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/a8_cTibZ.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/B-5ZfLrN.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/D72e2DEW.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/wFFmXPqF.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/CcA7kcll.js">
+	</head>
+
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">
+			<script>
+				{
+					__sveltekit_1rq9hpg = {
+						base: ""
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("/_app/immutable/entry/start.BMeVZFj3.js"),
+						import("/_app/immutable/entry/app.BDMrXeaZ.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element);
+					});
+				}
+			</script>
+		</div>
+
+		<div
+			id="splash-screen"
+			style="position: fixed; z-index: 100; top: 0; left: 0; width: 100%; height: 100%"
+		>
+			<style type="text/css" nonce="">
+				html {
+					overflow-y: scroll !important;
+				}
+			</style>
+
+			<div
+				style="
+					position: absolute;
+					top: 33%;
+					left: 50%;
+
+					width: 24rem;
+					transform: translateX(-50%);
+
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+				"
+			>
+				<img
+					id="logo-her"
+					style="width: auto; height: 13rem"
+					src="/static/splash.png"
+					class="animate-pulse-fast"
+				/>
+
+				<div style="position: relative; width: 24rem; margin-top: 0.5rem">
+					<div
+						id="progress-background"
+						style="
+							position: absolute;
+							width: 100%;
+							height: 0.75rem;
+
+							border-radius: 9999px;
+							background-color: #fafafa9a;
+						"
+					></div>
+
+					<div
+						id="progress-bar"
+						style="
+							position: absolute;
+							width: 0%;
+							height: 0.75rem;
+							border-radius: 9999px;
+							background-color: #fff;
+						"
+						class="bg-white"
+					></div>
+				</div>
+			</div>
+
+			<!-- <span style="position: absolute; bottom: 32px; left: 50%; margin: -36px 0 0 -36px">
+				Footer content
+			</span> -->
+		</div>
+	<script>
+		// DeepAgent: 侧边栏"工作空间"后注入 素材库/工具说明 入口(升级 open-webui 后需重打, 见 docs)
+		(function () {
+			function inject() {
+				var sb = document.getElementById('sidebar');
+				if (!sb) return false;
+				if (document.getElementById('deepagent-entry-wrap')) return true;
+				var wrap = document.createElement('div');
+				wrap.id = 'deepagent-entry-wrap';
+				wrap.style.cssText = 'width:100%;margin:4px 0;padding:4px 4px 4px;border-top:1px solid rgba(128,140,160,.3);';
+				function mk(href, text) {
+					var a = document.createElement('a');
+					a.href = href; a.textContent = text;
+					a.style.cssText = 'display:flex;align-items:center;gap:8px;margin:2px 6px;padding:8px 10px;'
+						+ 'border-radius:8px;font-size:13px;text-decoration:none;color:inherit;'
+						+ 'background:rgba(128,140,160,.12);cursor:pointer;';
+					a.onmouseenter = function () { a.style.background = 'rgba(128,140,160,.24)'; };
+					a.onmouseleave = function () { a.style.background = 'rgba(128,140,160,.12)'; };
+					wrap.appendChild(a);
+				}
+				mk('/media-ui/?v=20260914', '🖼️ 素材库');
+				mk('/media-ui/?v=20260914&docs=1', '🛠️ 工具说明');
+				// 定位"工作空间"项(兼容英文界面 Workspace), 插到它所在行之后; 找不到则放末尾
+				// 首选: 用链接地址定位(工作空间导航项 href="/workspace")
+				var anchor = sb.querySelector('a[href^="/workspace"]');
+				if (!anchor) {
+					// 兜底: 文本包含匹配
+					var nodes = sb.querySelectorAll('a, button, div, span');
+					for (var i = 0; i < nodes.length; i++) {
+						var txt = (nodes[i].textContent || '');
+						if (txt.indexOf('工作空间') !== -1 || txt.indexOf('Workspace') !== -1) {
+							anchor = nodes[i].closest ? (nodes[i].closest('a,button') || nodes[i]) : nodes[i];
+							break;
+						}
+					}
+				}
+				if (anchor) {
+					// 若工作空间行处于横向 flex 容器中, 向上找到非行容器, 保证入口换行显示在其下方
+					var spot = anchor;
+					while (spot.parentElement && spot.parentElement !== sb) {
+						var cs = getComputedStyle(spot.parentElement);
+						if (cs.display.indexOf('flex') === -1 || cs.flexDirection.indexOf('row') !== -1) { }
+						if (cs.display.indexOf('flex') !== -1 && cs.flexDirection.indexOf('row') !== -1) {
+							spot = spot.parentElement;
+						} else {
+							break;
+						}
+					}
+					spot.insertAdjacentElement('afterend', wrap);
+				} else {
+					sb.appendChild(wrap);
+				}
+				return true;
+			}
+			var mo = new MutationObserver(function () { inject(); });
+			mo.observe(document.body, { childList: true, subtree: true });
+			inject();
+		})();
+	</script>
+	</body>
+
+	<style type="text/css" nonce="">
+		html {
+			overflow-y: hidden !important;
+			overscroll-behavior-y: none;
+		}
+
+		#splash-screen {
+			background: #fff;
+		}
+
+		html.dark #splash-screen {
+			background: #000;
+		}
+
+		html.her #splash-screen {
+			background: #983724;
+		}
+
+		#logo-her {
+			display: none;
+		}
+
+		#progress-background {
+			display: none;
+		}
+
+		#progress-bar {
+			display: none;
+		}
+
+		html.her #logo {
+			display: none;
+		}
+
+		html.her #logo-her {
+			display: block;
+			filter: invert(1);
+		}
+
+		html.her #progress-background {
+			display: block;
+		}
+
+		html.her #progress-bar {
+			display: block;
+		}
+
+		@media (max-width: 24rem) {
+			html.her #progress-background {
+				display: none;
+			}
+
+			html.her #progress-bar {
+				display: none;
+			}
+		}
+
+		@keyframes pulse {
+			50% {
+				opacity: 0.65;
+			}
+		}
+
+		.animate-pulse-fast {
+			animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+		}
+	</style>
+</html>
