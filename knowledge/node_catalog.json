@@ -1,0 +1,73 @@
+{
+    "version": 1,
+    "description": "DeepAgent 节点目录：语义 key -> udrt 模块 ID / 端口索引 / 属性默认值。LLM 只引用此目录生成 Graph Plan IR，udrt 由编译器确定性生成。Titan Sink/Source、AV Monitor 为 DeepRT 宿主内置节点（对照 udrt/gaus_render.udrt）。",
+    "nodes": {
+        "saturn_subtitle_html": {
+            "model_name": "0x70000002",
+            "model_comment": "SubTitle Html Gen",
+            "kind": "saturn",
+            "description": "字幕文本 -> LLM -> 字幕 HTML 文件（Graph_Saturn 真实节点 subtitle_gen::CDyProps）",
+            "input_ports": {},
+            "output_ports": { "html_file": 0 },
+            "props": {
+                "strGuid": "",
+                "strContent": "",
+                "strPrompt": "",
+                "strOutputDir": "",
+                "strApiKey": "",
+                "strModel": "",
+                "nActiveSegment": 0
+            },
+            "props_st": {},
+            "sinker_index": 0
+        },
+        "saturn_gaus_render": {
+            "model_name": "0x70000001",
+            "model_comment": "Gaussian Render",
+            "kind": "saturn",
+            "description": "本地 PLY 高斯渲染节点（Graph_Saturn 真实节点）",
+            "input_ports": {},
+            "output_ports": { "render_out": 0 },
+            "props": {
+                "fCamDistanceScale": 0.10000000149011612,
+                "fCamera_fov": 38.94029998779297,
+                "fPitch": 0,
+                "fYaw": 0,
+                "fZoom": 1
+            },
+            "props_st": {}
+        },
+        "titan_sink": {
+            "model_name": "0x00000001",
+            "model_comment": "Titan Sink",
+            "kind": "builtin",
+            "description": "DeepRT 宿主输出节点",
+            "input_ports": { "in0": 0 },
+            "output_ports": {},
+            "props": {},
+            "props_st": {},
+            "sinker_index": 0
+        },
+        "titan_source": {
+            "model_name": "0x00000002",
+            "model_comment": "Titan Source",
+            "kind": "builtin",
+            "description": "DeepRT 宿主输入源节点",
+            "input_ports": {},
+            "output_ports": { "out0": 0 },
+            "props": {},
+            "props_st": {},
+            "source_index": 0
+        },
+        "av_monitor": {
+            "model_name": "0x00000003",
+            "model_comment": "AV Monitor",
+            "kind": "builtin",
+            "description": "DeepRT 宿主监视器节点",
+            "input_ports": { "in0": 0 },
+            "output_ports": {},
+            "props": { "m_eShowMode": 0 },
+            "props_st": { "m_eInputOrientation": 0 }
+        }
+    }
+}

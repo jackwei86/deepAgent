@@ -1,0 +1,28 @@
+# Build artifacts
+build/
+x64/
+Debug/
+Release/
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.log.tmp
+
+# Visual Studio / IDE
+.vs/
+*.user
+*.suo
+
+# Runtime data（运行产物不入库：日志/会话/生成物）
+output/deepagent.log
+output/chats.json
+output/chats.json.bad
+output/chats.json.tmp
+output/node_contexts.json
+output/node_contexts.json.bad
+output/node_contexts.json.tmp
+output/udrt/
+
+# Secrets（API key 不入库；本地保留 config/.env，模板见 .env.example）
+config/.env

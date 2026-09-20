@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepAgent · Graph_Saturn AI 助手</title>
+    <link rel="stylesheet" href="/style.css?v=20260920">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+<body>
+<div class="layout">
+    <!-- ======== 左侧会话栏（Open WebUI 风格） ======== -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="brand">
+                <span class="brand-logo">🤖</span>
+                <span class="brand-name">DeepAgent</span>
+            </div>
+            <button class="collapse-btn" id="collapseBtn" title="收起/展开侧栏">⟨</button>
+        </div>
+        <button class="new-chat-btn" id="newChatBtn">
+            <span class="plus">＋</span> 新会话
+        </button>
+        <div class="chat-list-title">会话列表</div>
+        <nav class="chat-list" id="chatList"></nav>
+        <div class="sidebar-footer">
+            <div class="footer-item" id="healthInfo" title="后端与 LLM 配置状态">
+                <span class="dot" id="healthDot"></span>
+                <span id="healthText">连接中…</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ======== 主聊天区 ======== -->
+    <main class="main">
+        <header class="main-header">
+            <div class="model-info">
+                <span class="model-name">DeepAgent</span>
+                <span class="model-sub" id="modelSub">Graph_Saturn 工具 Node 编排助手</span>
+            </div>
+            <button class="kb-btn" id="kbBtn" title="查看知识库">📚 知识库</button>
+        </header>
+
+        <section class="chat-area" id="chatArea">
+            <div class="welcome" id="welcome">
+                <div class="welcome-logo">🤖</div>
+                <h1>DeepAgent</h1>
+                <p>分析您的需求，自动选择 Graph_Saturn 中的工具 Node，并生成 .udrt 图工程文件</p>
+                <div class="welcome-cards">
+                    <button class="card" data-prompt="请根据这段字幕文本生成字幕 HTML 文件：&#10;你好，欢迎来到 DeepAgent 演示。&#10;这是第二句字幕，用于测试多行对白。">
+                        <div class="card-icon">🎬</div>
+                        <div class="card-title">字幕 HTML 生成</div>
+                        <div class="card-desc">根据字幕文本调用 LLM 生成字幕所需 HTML 文件</div>
+                    </button>
+                    <button class="card" data-prompt="帮我搭建一个高斯渲染节点工程，用于展示 PLY 点云">
+                        <div class="card-icon">🌌</div>
+                        <div class="card-title">高斯渲染</div>
+                        <div class="card-desc">搭建 Gaussian Render 高斯点云渲染图工程</div>
+                    </button>
+                    <button class="card" data-prompt="你是谁？你能帮我做什么？">
+                        <div class="card-icon">💬</div>
+                        <div class="card-title">了解 DeepAgent</div>
+                        <div class="card-desc">询问 DeepAgent 的能力与工作方式</div>
+                    </button>
+                </div>
+            </div>
+            <div class="messages" id="messages"></div>
+        </section>
+
+        <footer class="input-area">
+            <div class="input-box">
+                <textarea id="inputText" placeholder="输入需求，例如：请根据这段字幕文本生成字幕 HTML 文件……" rows="1"></textarea>
+                <div class="input-actions">
+                    <button class="icon-btn mic-btn" id="micBtn" title="语音输入（点击开始/停止）">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="23"/>
+                            <line x1="8" y1="23" x2="16" y2="23"/>
+                        </svg>
+                    </button>
+                    <button class="send-btn" id="sendBtn" title="发送">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"/>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="input-hint">DeepAgent 由 DeepSeek 驱动 · 生成内容仅供参考 · udrt 由本地节点目录确定性编译，LLM 不直接生成</div>
+        </footer>
+    </main>
+</div>
+
+<!-- 知识库弹窗 -->
+<div class="modal-mask" id="kbModal" style="display:none">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>📚 外部知识库（工具 Node 条目）</h2>
+            <button class="close-btn" id="kbCloseBtn">✕</button>
+        </div>
+        <div class="modal-body" id="kbBody">加载中…</div>
+    </div>
+</div>
+
+<script src="/voice_input.js?v=20260920"></script>
+<script src="/app.js?v=20260920"></script>
+</body>
+</html>

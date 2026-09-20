@@ -1,0 +1,52 @@
+{
+    "version": 1,
+    "description": "DeepAgent 外部知识库：可调用的 Graph 工具 Node 条目。saturn_subtitle_html 为预设条目（该 Node 由 DeepAgent 知识库预设，未在 Graph_Saturn 工程中实现）；saturn_gaus_render 对应 Graph_Saturn 中真实存在的 Gaussian Render 节点。",
+    "entries": [
+        {
+            "id": "saturn_subtitle_html",
+            "name": "SubTitle Html Gen",
+            "project": "Graph_Saturn",
+            "module_id": "0x70000002",
+            "kind": "real",
+            "description": "Graph_Saturn 中的 LLM 字幕生成节点（llm_subtitle_source）：将 strContent 中的字幕源文本交给 LLM，生成字幕播放所需的 HTML 文件。支持 strPrompt 多轮修改指令（字体大小/颜色等）。当用户希望根据字幕文本/对白文本生成字幕 HTML、字幕网页、字幕文件时，应选择此工具 Node。",
+            "keywords": ["字幕", "对白", "台词", "subtitle", "html", "字幕文件", "字幕html", "网页字幕"],
+            "input": "用户提供的字幕文本（多行对白），编译 udrt 时写入节点动态属性 strContent；其余属性 strPrompt/strOutputDir/strApiKey/strModel 保持空 = 节点内置默认行为",
+            "output": "字幕 HTML 文件（html_file 输出端口；strOutputDir 空 = exe 目录下 subtitle_out）",
+            "example_prompt": "请根据这段字幕文本生成字幕 HTML 文件：第一句台词……",
+            "udrt_template": {
+                "file_prefix": "subtitle_html",
+                "nodes": [
+                    { "key": "tool", "catalog": "saturn_subtitle_html" },
+                    { "key": "sink", "catalog": "titan_sink" }
+                ],
+                "links": [
+                    { "from": "tool:html_file", "to": "sink:in0" }
+                ]
+            }
+        },
+        {
+            "id": "saturn_gaus_render",
+            "name": "Gaussian Render",
+            "project": "Graph_Saturn",
+            "module_id": "0x70000001",
+            "kind": "real",
+            "description": "Graph_Saturn 中真实存在的高斯渲染节点：加载本地 PLY 点云进行高斯泼溅渲染，输出金字塔纹理。当用户希望渲染 PLY、高斯点云可视化、三维高斯渲染时，应选择此工具 Node。",
+            "keywords": ["高斯", "渲染", "ply", "点云", "gaussian", "render", "高斯渲染", "三维"],
+            "input": "本地 PLY 点云文件（节点静态资源）",
+            "output": "高斯渲染金字塔纹理（render_out 输出端口，pin_format::pyramid_tex_rgb_family）",
+            "example_prompt": "帮我搭建一个高斯渲染节点工程",
+            "udrt_template": {
+                "file_prefix": "gaus_render",
+                "nodes": [
+                    { "key": "tool", "catalog": "saturn_gaus_render" },
+                    { "key": "sink", "catalog": "titan_sink" },
+                    { "key": "monitor", "catalog": "av_monitor" }
+                ],
+                "links": [
+                    { "from": "tool:render_out", "to": "sink:in0" },
+                    { "from": "tool:render_out", "to": "monitor:in0" }
+                ]
+            }
+        }
+    ]
+}

@@ -1,0 +1,4 @@
+// DeepAgentBackend.rc : 托盘应用图标资源
+#include "resource.h"
+
+IDI_APPICON ICON "app.ico"
