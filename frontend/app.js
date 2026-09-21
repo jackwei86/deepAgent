@@ -92,6 +92,8 @@
     }
 
     // ---------- 会话列表 ----------
+    var archivedOpen = false;   // 归档分组展开状态（跨重渲染保持）
+
     function loadChatList(selectId) {
         fetch('/api/chats').then(function (r) { return r.json(); }).then(function (chats) {
             chatListEl.innerHTML = '';
@@ -107,15 +109,16 @@
             // 已归档分区（可折叠分组：右侧箭头指示折叠状态）
             if (archived.length) {
                 var header = document.createElement('div');
-                header.className = 'archived-header';
+                header.className = 'archived-header' + (archivedOpen ? ' open' : '');
                 header.innerHTML = '<span class="archived-title">已归档</span>' +
                     '<span class="chevron">▾</span>' +
                     '<span class="count">' + archived.length + '</span>';
                 var group = document.createElement('div');
-                group.className = 'archived-group collapsed';
+                group.className = 'archived-group' + (archivedOpen ? '' : ' collapsed');
                 header.onclick = function () {
-                    header.classList.toggle('open');
-                    group.classList.toggle('collapsed');
+                    archivedOpen = !archivedOpen;
+                    header.classList.toggle('open', archivedOpen);
+                    group.classList.toggle('collapsed', !archivedOpen);
                 };
                 chatListEl.appendChild(header);
                 chatListEl.appendChild(group);
@@ -207,12 +210,58 @@
         } else {
             contentEl.innerHTML = renderMarkdown(content);
         }
+        // 原始文本（assistant 流式回复期间由 token/done 处理器持续更新）
+        bubble.__raw = content;
+
+        // 复制按钮：复制这条消息的全文（用户消息 / 助手回复通用）
+        var copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.type = 'button';
+        copyBtn.title = '复制全文';
+        copyBtn.textContent = '复制';
+        copyBtn.addEventListener('click', function () {
+            var text = (bubble.__raw !== undefined && bubble.__raw !== null)
+                ? String(bubble.__raw)
+                : contentEl.innerText;
+            copyText(text, copyBtn);
+        });
+
         bubble.appendChild(contentEl);
+        bubble.appendChild(copyBtn);
         msg.appendChild(avatar);
         msg.appendChild(bubble);
         messagesEl.appendChild(msg);
         scrollBottom();
         return { msg: msg, bubble: bubble, content: contentEl };
+    }
+
+    // 复制到剪贴板（优先异步 clipboard API，http://127.0.0.1 属安全上下文；
+    // execCommand 兜底），按钮给出 1.2s "已复制" 反馈
+    function copyText(text, btn) {
+        function feedback() {
+            btn.textContent = '已复制 ✓';
+            btn.classList.add('copied');
+            setTimeout(function () {
+                btn.textContent = '复制';
+                btn.classList.remove('copied');
+            }, 1200);
+        }
+        function legacyCopy() {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+            document.body.removeChild(ta);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(feedback, function () { legacyCopy(); feedback(); });
+        } else {
+            legacyCopy();
+            feedback();
+        }
     }
 
     function scrollBottom() {
@@ -328,13 +377,65 @@
         scrollBottom();
     }
 
+    // ---------- 附件管理 ----------
+    var pendingAttachments = [];   // [{filename, content}]
+
+    var fileInputEl = document.createElement('input');
+    fileInputEl.type = 'file';
+    fileInputEl.accept = '.udrt,.xml,.json,.txt,.md';
+    fileInputEl.multiple = true;
+    fileInputEl.style.display = 'none';
+    document.body.appendChild(fileInputEl);
+
+    fileInputEl.addEventListener('change', function () {
+        var files = fileInputEl.files;
+        if (!files.length) return;
+        var loaded = 0;
+        Array.prototype.forEach.call(files, function (f) {
+            var reader = new FileReader();
+            reader.onload = function () {
+                pendingAttachments.push({ filename: f.name, content: reader.result });
+                renderAttachmentTags();
+                if (++loaded === files.length) fileInputEl.value = '';
+            };
+            reader.readAsText(f);
+        });
+    });
+
+    function renderAttachmentTags() {
+        var box = document.getElementById('attachmentTags');
+        if (!box) return;
+        box.innerHTML = '';
+        pendingAttachments.forEach(function (a, i) {
+            var tag = document.createElement('span');
+            tag.className = 'attach-tag';
+            tag.innerHTML = '📎 ' + escapeHtml(a.filename) +
+                '<span class="tag-del" data-i="' + i + '">✕</span>';
+            tag.querySelector('.tag-del').onclick = function () {
+                pendingAttachments.splice(i, 1);
+                renderAttachmentTags();
+            };
+            box.appendChild(tag);
+        });
+        box.style.display = pendingAttachments.length ? 'flex' : 'none';
+    }
+
+    function clearAttachments() {
+        pendingAttachments = [];
+        renderAttachmentTags();
+    }
+
+    document.getElementById('attachBtn').onclick = function () { fileInputEl.click(); };
+
     // ---------- 发送消息（SSE 流式） ----------
     function sendMessage() {
         var text = inputEl.value.trim();
         if (!text || sending) return;
+        var attachments = pendingAttachments.splice(0);   // 取走并清空
         sending = true;
         sendBtn.disabled = true;
         inputEl.value = '';
+        renderAttachmentTags();
         autoGrow();
 
         welcomeEl.style.display = 'none';
@@ -345,10 +446,13 @@
         var status = appendStatusStream(holder.bubble);
         var acc = '';
 
+        var bodyPayload = { chat_id: currentChatId, message: text };
+        if (attachments.length) bodyPayload.attachments = attachments;
+
         fetch('/api/chat/stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: currentChatId, message: text })
+            body: JSON.stringify(bodyPayload)
         }).then(function (res) {
             if (!res.ok) {
                 // 非 2xx：读取错误信息并以 error 事件呈现，避免静默无回复
@@ -395,6 +499,7 @@
                 } else if (event === 'token') {
                     status.done();
                     acc += j.delta || '';
+                    holder.bubble.__raw = acc;
                     contentEl.innerHTML = renderMarkdown(acc);
                     scrollBottom();
                 } else if (event === 'udrt') {
@@ -412,6 +517,7 @@
             var finishFrame = null;
             function finish() {
                 if (!acc && finishFrame && finishFrame.reply) {
+                    holder.bubble.__raw = finishFrame.reply;
                     contentEl.innerHTML = renderMarkdown(finishFrame.reply);
                 }
                 if (!acc && !finishFrame) {

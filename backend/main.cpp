@@ -143,16 +143,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
     deepagent::Logf("udrt output   : %s", config.udrt_output_dir.c_str());
 
     // 4. 服务器对象（回调与服务器线程都会使用，生命周期覆盖消息泵）
+    // Node 按 GUID 的 LLM 对话上下文存储 + 过期清理线程（AgentGraph 构造依赖，先建）
+    deepagent::NodeContextStore nodeContexts(rootDir + "\\output\\node_contexts.json");
+    if (!nodeContexts.load(&err)) deepagent::Logf("[WARN] %s", err.c_str());
     deepagent::LlmClient llm(config);
     deepagent::UdrtCompiler compiler(catalog);
-    deepagent::AgentGraph agent(config, llm, knowledge, catalog, compiler);
+    deepagent::AgentGraph agent(config, llm, knowledge, catalog, compiler, nodeContexts);
     deepagent::ChatStore chats(config.chats_file);
     if (!chats.load(&err)) deepagent::Logf("[WARN] %s", err.c_str());
     deepagent::Logf("chats file   : %s", config.chats_file.c_str());
 
-    // Node 按 GUID 的 LLM 对话上下文存储 + 过期清理线程
-    deepagent::NodeContextStore nodeContexts(rootDir + "\\output\\node_contexts.json");
-    if (!nodeContexts.load(&err)) deepagent::Logf("[WARN] %s", err.c_str());
     std::atomic<bool> purgeStop{false};
     std::thread purgeThread([&nodeContexts, &config, &purgeStop]() {
         nodeContexts.purgeExpired(config.ctx_retention_days);

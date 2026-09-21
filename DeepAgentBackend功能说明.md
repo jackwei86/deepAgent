@@ -99,9 +99,21 @@ U-DeepRT 节点 Execute（帧内）：
 
 ### 3.4 知识库与节点目录（可扩展）
 
-- `knowledge/knowledge_base.json`：工具 Node 语义条目（id、名称、模块 ID、能力描述、关键词、输入输出、`udrt_template`）。当前两条：`saturn_subtitle_html`（SubTitle Html Gen，`0x70000002`）与 `saturn_gaus_render`（Gaussian Render，`0x70000001`）。
+- `knowledge/knowledge_base.json`：工具 Node 语义条目（id、名称、模块 ID、能力描述、关键词、输入输出、`udrt_template`、`asset_pipeline`）。当前两条：`saturn_subtitle_html`（SubTitle Html Gen，`0x70000002`）与 `saturn_gaus_render`（Gaussian Render，`0x70000001`）。
 - `knowledge/node_catalog.json`：确定性编译依据——catalog key → `model_name`、语义端口→数字端口索引、props/props_st 默认值（字幕节点含 `strGuid` 占位）、内置宿主节点 Titan Sink/Source、AV Monitor。
 - **扩展新工具 Node**：在两个 JSON 中新增条目与目录项即可，无需改代码。
+
+### 3.5 资产生成子步并发（NeoGraph 结构化并发与超步，2026-09-20 新增）
+
+**设计文档：`docs/Node资产生成子步并发设计.md`（含 F1-F12 逐项测试矩阵）。** HTML 资产生成从"一次 LLM 调用整页产出"升级为子步图执行（`backend/asset_pipeline/asset_adapters/asset_runner.{h,cpp}`）：
+
+- **管线形态**：启用背景板时 `__start__ ─┬→ {guid8}_bg(适配器) ──┬→ {guid8}_compose(barrier AND-join) → {guid}.html`；背景板与 LLM 内容分支在**同一超步并行**（worker_count 线程池 + parallel_group），合成节点等齐两路才执行。禁用时退化为单 content 分支（与旧行为等价）。
+- **背景板可选**：`create_udrt`/`generate_node_asset` 工具新增 `background` 布尔参数（LLM 语义层填写）；缺省按文本关键词（背景板/背景图/背景色/加背景/background 等）自动判定。确定性编译期裁剪，不产生 barrier 信号缺口。
+- **适配器 v1（C++ 注册表，QuickJS 脚本化接口已预留）**：`bg_plate`（样式关键词→参数化 CSS 背景片段）、`html_compose`（背景层与 LLM 内容融合；bg 缺失时透传）。
+- **knowledge_base.json 条目可带 `asset_pipeline`** 覆盖默认管线（branches + compose）；无该字段的条目隐式单分支。
+- **SSE 新事件 `node_state`**：`{guid, step(bg/content/compose 节点名), state(running/done/failed)}`，前端可展示子步进度；`/api/nodes/{guid}/generate` 的 body 也支持 `background`。
+- **可靠性**：适配器子步默认重试 1 次；LLM 分支失败快速传播（compose 不执行、未完成子步报 failed）；多轮上下文完整传入 content 分支。
+- **逐项功能测试**：`backend/build_asset_test.bat` → `asset_feature_test.exe`（F1-F12，37 项断言全通过，含并发墙钟断言 119-123ms vs 串行 200ms+）。
 
 ## 4. 核心功能 B：Node 上下文管理（按 GUID）
 
@@ -161,6 +173,7 @@ LLM 协议：OpenAI 兼容 chat completions（Bearer 认证），支持流式（
 
 - Open WebUI 风格布局：深色会话侧边栏（新建/切换/删除会话、后端健康状态指示）+ 聊天主区；
 - SSE 流式渲染：状态条（步骤进度 + 完成态）、Markdown 回复（标题/列表/代码块/表格）、udrt 结果卡片（节点/连接数、文件路径、⬇ 下载、**📂 打开所在目录**、JSON 折叠预览）、HTML 资产卡片（🌐 浏览器查看 / 📂 打开所在目录 / ⬇ 下载）；
+- **消息复制按钮**（2026-09-20）：每条消息（用户发送 / 助手回复）气泡右上角悬停出现"复制"，一键复制全文——用户消息复制原文，助手回复复制**原始 Markdown**（流式回复期间也可复制已到达部分）；点击后显示"已复制 ✓"1.2 秒反馈；clipboard API 不可用时自动回退 execCommand；
 - 欢迎页示例卡片（字幕 HTML 生成 / 高斯渲染 / 了解 DeepAgent）一键发送；
 - 知识库弹窗：条目名称、模块 ID、预设/真实标签、输入输出说明；
 - 语音输入：Web Speech API（`zh-CN`，连续识别 + 中间结果上屏；不支持的环境按钮置灰，识别错误弹出提示）；

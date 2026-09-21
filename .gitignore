@@ -26,3 +26,13 @@ output/udrt/
 
 # Secrets（API key 不入库；本地保留 config/.env，模板见 .env.example）
 config/.env
+
+# NeoGraph（独立 clone，不嵌入本仓库）
+third_party/NeoGraph/
+
+# 测试产物
+backend/asset_feature_test.exe
+backend/asset_test_out/
+backend/sqlite3.obj
+third_party/sqlite3/*.obj
+third_party/sqlite3/*.pdb

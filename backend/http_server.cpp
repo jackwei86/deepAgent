@@ -1,6 +1,8 @@
 #include "http_server.h"
 
+#include <filesystem>
 #include <fstream>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <iterator>
@@ -8,6 +10,8 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include "asset_pipeline.h"
+#include "asset_runner.h"
 #include "log.h"
 #include "third_party/httplib.h"
 #include "third_party/json.hpp"
@@ -116,11 +120,16 @@ void HttpServer::registerHandlers() {
     });
 
     server_->Delete(R"(/api/chats/([0-9a-zA-Z_]+))", [this](const Request& req, Response& res) {
-        if (!chats_.removeChat(req.matches[1].str())) {
+        std::string delChatId = req.matches[1].str();
+        if (!chats_.removeChat(delChatId)) {
             res.status = 404;
             res.set_content(R"({"error":"chat not found"})", "application/json; charset=utf-8");
             return;
         }
+        // 联动清理：删除该会话关联的上传文件目录
+        std::string upDir = config_.exe_dir + "\\uploads\\" + delChatId;
+        std::error_code ec;
+        std::filesystem::remove_all(upDir, ec);
         res.set_content(R"({"deleted":true})", "application/json; charset=utf-8");
     });
 
@@ -333,16 +342,32 @@ void HttpServer::handleNodeGenerate(const std::string& guid, const Request& req,
         return;
     }
 
-    std::vector<ChatMessage> llmMessages;
-    for (const auto& m : messages) {
-        llmMessages.push_back({m.value("role", ""), m.value("content", "")});
-    }
-    std::string llmErr;
-    std::string reply = llm_.invoke(llmMessages, &llmErr);
-    if (reply.empty()) {
-        nodeContexts_.failTurn(guid, llmErr.empty() ? "empty LLM reply" : llmErr);
+    // 子步管线执行（可选背景板分支 ∥ LLM 内容分支 → 合成；body.background 控制）
+    std::optional<bool> background;
+    if (body.contains("background") && body["background"].is_boolean())
+        background = body["background"].get<bool>();
+
+    AssetRunnerConfig rc;
+    rc.api_key = config_.llm_api_key;
+    rc.base_url = config_.llm_base_url;
+    rc.model = config_.llm_model;
+    rc.system_prompt = system;
+    AssetGraphRunner runner(rc);
+
+    AssetRequest assetReq;
+    assetReq.guid = guid;
+    assetReq.short_id = guid.size() >= 8 ? guid.substr(0, 8) : guid;
+    assetReq.messages = messages;
+    assetReq.context = json{{"content", text}, {"style", kind == "prompt" ? text : ""}};
+    assetReq.wants_background = wantsBackground(background, text, "");
+
+    auto results = runner.run({std::move(assetReq)}, defaultSubtitlePipeline(), nullptr);
+    const auto& r = results.front();
+    if (!r.ok || r.final_html.empty()) {
+        const std::string fail = r.error.empty() ? "empty pipeline result" : r.error;
+        nodeContexts_.failTurn(guid, fail);
         res.status = 502;
-        json body{{"state", "failed"}, {"error", llmErr}};
+        json body{{"state", "failed"}, {"error", fail}};
         res.set_content(body.dump(), "application/json; charset=utf-8");
         return;
     }
@@ -352,9 +377,9 @@ void HttpServer::handleNodeGenerate(const std::string& guid, const Request& req,
         json ctx = nodeContexts_.getContext(guid);
         if (ctx.is_object()) version = ctx.value("version", 0);
     }
-    nodeContexts_.completeTurn(guid, reply);
+    nodeContexts_.completeTurn(guid, r.final_html);
 
-    json result{{"state", "done"}, {"html", reply}, {"version", version + 1}, {"guid", guid}};
+    json result{{"state", "done"}, {"html", r.final_html}, {"version", version + 1}, {"guid", guid}};
     res.set_content(result.dump(), "application/json; charset=utf-8");
 }
 
@@ -382,6 +407,81 @@ void HttpServer::handleChatStream(const Request& req, Response& res) {
         if (existing.is_null()) chatId = chats_.createChat();
     }
 
+    // 附件：[{filename, content}]，保存到 uploads\{chat_id}\ 并注入用户消息
+    std::string attachmentContext;
+    {
+        json attachArr = body.value("attachments", json::array());
+        if (attachArr.is_array() && !attachArr.empty()) {
+            std::string uploadsDir = config_.exe_dir + "\\uploads\\" + chatId;
+            std::error_code ec;
+            std::filesystem::create_directories(uploadsDir, ec);
+            for (const auto& a : attachArr) {
+                std::string fname = a.value("filename", "");
+                std::string content = a.value("content", "");
+                if (fname.empty() || content.empty()) continue;
+                // 安全：剥路径只取文件名
+                size_t slash = fname.find_last_of("\\/");
+                if (slash != std::string::npos) fname = fname.substr(slash + 1);
+                std::string fpath = uploadsDir + "\\" + fname;
+                std::ofstream ofs(fpath, std::ios::binary | std::ios::trunc);
+                if (ofs) { ofs << content; }
+                Logf("[upload] saved %s (%zu bytes) to %s", fname.c_str(), content.size(), fpath.c_str());
+            }
+        }
+    }
+
+    // 聊天中输入 .udrt/.xml 路径：自动读取文件内容注入用户消息
+    {
+        size_t searchPos = 0;
+        while (searchPos < message.size()) {
+            size_t dot = message.find('.', searchPos);
+            if (dot == std::string::npos) break;
+            size_t extEnd = dot;
+            while (extEnd < message.size() &&
+                   (isalnum((unsigned char)message[extEnd]) || message[extEnd] == '.' ||
+                    message[extEnd] == '_' || message[extEnd] == '-' ||
+                    message[extEnd] == '\\' || message[extEnd] == '/' || message[extEnd] == ':'))
+                ++extEnd;
+            std::string candidate = message.substr(searchPos, extEnd - searchPos);
+            bool isUdrt = candidate.size() > 5 && candidate.substr(candidate.size() - 5) == ".udrt";
+            bool isXml  = candidate.size() > 4 && candidate.substr(candidate.size() - 4) == ".xml";
+            if ((isUdrt || isXml) &&
+                (candidate.find('\\') != std::string::npos || candidate.find('/') != std::string::npos)) {
+                // 尝试读取文件
+                int wl = MultiByteToWideChar(CP_UTF8, 0, candidate.c_str(), (int)candidate.size(), nullptr, 0);
+                std::wstring wp(wl, L'\0');
+                MultiByteToWideChar(CP_UTF8, 0, candidate.c_str(), (int)candidate.size(), &wp[0], wl);
+                DWORD attr = GetFileAttributesW(wp.c_str());
+                if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
+                    std::ifstream ifs(wp.c_str(), std::ios::binary);
+                    if (ifs) {
+                        std::string fileContent((std::istreambuf_iterator<char>(ifs)),
+                                                std::istreambuf_iterator<char>());
+                        if (!fileContent.empty()) {
+                            // 保存副本到 uploads
+                            std::string upDir = config_.exe_dir + "\\uploads\\" + chatId;
+                            std::error_code fsec;
+                            std::filesystem::create_directories(upDir, fsec);
+                            size_t slash = candidate.find_last_of("\\/");
+                            std::string baseName = (slash != std::string::npos) ? candidate.substr(slash + 1) : candidate;
+                            std::string copyPath = upDir + "\\" + baseName;
+                            std::ofstream cp(copyPath, std::ios::binary | std::ios::trunc);
+                            if (cp) { cp << fileContent; }
+                            // 追加到附件上下文
+                            attachmentContext += "\n\n--- 文件: " + candidate + " ---\n" + fileContent.substr(0, 12000);
+                            Logf("[path_input] auto-read %s (%zu bytes)", candidate.c_str(), fileContent.size());
+                        }
+                    }
+                }
+            }
+            searchPos = extEnd;
+        }
+    }
+
+    if (!attachmentContext.empty()) {
+        message += "\n\n[以下是用户附加的文件内容，请分析并据此回答：]\n" + attachmentContext;
+    }
+
     res.set_header("Cache-Control", "no-cache");
     res.set_header("X-Accel-Buffering", "no");
     res.set_chunked_content_provider(
@@ -403,6 +503,9 @@ void HttpServer::handleChatStream(const Request& req, Response& res) {
             };
             eventSink.onAsset = [&sink](const json& payload) {
                 writeFrame(sink, "asset", payload);
+            };
+            eventSink.onNodeState = [&sink](const json& payload) {
+                writeFrame(sink, "node_state", payload);
             };
 
             std::string err;

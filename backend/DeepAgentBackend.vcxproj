@@ -29,6 +29,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>E:\totem_AI\MetaSDK\x64\Debug\</OutDir>
+    <LibraryPath>$(ProjectDir)..\third_party\NeoGraph\build\Debug;D:\ProgramData\Anaconda3\Library\lib;$(LibraryPath)</LibraryPath>
     <IntDir>$(SolutionDir)build\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>DeepAgentBackend</TargetName>
   </PropertyGroup>
@@ -36,18 +37,18 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;ASIO_STANDALONE;ASIO_NO_DEPRECATED;_WIN32_WINNT=0x0A00;NEOGRAPH_STATIC_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\third_party\NeoGraph\include;$(ProjectDir)..\third_party\NeoGraph\deps\asio\include;$(ProjectDir)..\third_party\NeoGraph\deps\yyjson;$(ProjectDir)..\third_party\NeoGraph\deps;D:\ProgramData\Anaconda3\Library\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>winhttp.lib;shell32.lib;user32.lib;gdi32.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>neograph_core.lib;neograph_llm.lib;neograph_program.lib;neograph_sqlite.lib;neograph_async.lib;yyjson.lib;libcrypto.lib;libssl.lib;winhttp.lib;shell32.lib;user32.lib;gdi32.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -58,6 +59,9 @@
     <ClCompile Include="node_catalog.cpp" />
     <ClCompile Include="udrt_compiler.cpp" />
     <ClCompile Include="agent_graph.cpp" />
+    <ClCompile Include="asset_pipeline.cpp" />
+    <ClCompile Include="asset_adapters.cpp" />
+    <ClCompile Include="asset_runner.cpp" />
     <ClCompile Include="chat_store.cpp" />
     <ClCompile Include="http_server.cpp" />
     <ClCompile Include="node_context.cpp" />
@@ -71,6 +75,9 @@
     <ClInclude Include="node_catalog.h" />
     <ClInclude Include="udrt_compiler.h" />
     <ClInclude Include="agent_graph.h" />
+    <ClInclude Include="asset_pipeline.h" />
+    <ClInclude Include="asset_adapters.h" />
+    <ClInclude Include="asset_runner.h" />
     <ClInclude Include="chat_store.h" />
     <ClInclude Include="http_server.h" />
     <ClInclude Include="node_context.h" />

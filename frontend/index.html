@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DeepAgent · Graph_Saturn AI 助手</title>
-    <link rel="stylesheet" href="/style.css?v=20260920">
+    <link rel="stylesheet" href="/style.css?v=20260920b">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 </head>
 <body>
@@ -68,9 +68,17 @@
         </section>
 
         <footer class="input-area">
+            <input type="file" id="fileInput" accept=".udrt,.xml,.json,.txt,.md"
+                   multiple style="display:none">
+            <div class="attachment-tags" id="attachmentTags"></div>
             <div class="input-box">
                 <textarea id="inputText" placeholder="输入需求，例如：请根据这段字幕文本生成字幕 HTML 文件……" rows="1"></textarea>
                 <div class="input-actions">
+                    <button class="icon-btn attach-btn" id="attachBtn" title="附加文件（.udrt/.xml/.json/.txt/.md）">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                        </svg>
+                    </button>
                     <button class="icon-btn mic-btn" id="micBtn" title="语音输入（点击开始/停止）">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
@@ -103,7 +111,7 @@
     </div>
 </div>
 
-<script src="/voice_input.js?v=20260920"></script>
-<script src="/app.js?v=20260920"></script>
+<script src="/voice_input.js?v=20260920b"></script>
+<script src="/app.js?v=20260920b"></script>
 </body>
 </html>

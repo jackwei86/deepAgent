@@ -4,10 +4,40 @@
 #include <string.h>
 #include <sstream>
 
+#include "asset_pipeline.h"
+#include "asset_runner.h"
+
+#include <neograph/llm/agent.h>
+#include <neograph/llm/openai_provider.h>
+
 using json = nlohmann::json;
 
 namespace deepagent {
 namespace {
+
+// 字幕 HTML 生成的 system 提示词（对话中直接生成 HTML 资产时使用）
+const char* const kSubtitleSystemPrompt =
+    "你是字幕排版助手。将用户提供的 markdown 字幕文本转换为可直接在浏览器打开的完整 HTML 文件："
+    "输出以 <!DOCTYPE html> 开头的完整文档，样式全部内嵌在 <style> 中，"
+    "默认白底黑字、水平垂直居中、字号适中、行距舒适。"
+    "多轮对话时用户会提出字体大小、颜色等修改要求，请在最近一版 HTML 基础上修改后输出完整 HTML。"
+    "只输出 HTML 代码本身，不要任何解释，不要 markdown 代码围栏。";
+
+// LLM 可能用 ```html ... ``` 围栏包裹结果：剥围栏，无围栏则原样返回
+std::string StripHtmlFence(const std::string& strContent)
+{
+    const size_t nFenceHead = strContent.find("```");
+    if (nFenceHead == std::string::npos)
+        return strContent;
+    size_t nStart = strContent.find('\n', nFenceHead);
+    if (nStart == std::string::npos)
+        return strContent;
+    ++nStart;
+    size_t nEnd = strContent.find("```", nStart);
+    if (nEnd == std::string::npos)
+        nEnd = strContent.size();
+    return strContent.substr(nStart, nEnd - nStart);
+}
 
 // Robustly extract a JSON object from LLM text (skips prose/markdown fences).
 bool extractJsonObject(const std::string& text, json* out) {
@@ -27,34 +57,399 @@ std::string statusText(const json& entry) {
     return entry.value("name", "") + " (" + entry.value("module_id", "") + ")";
 }
 
-const char* const kSubtitleSystemPrompt =
-    "你是字幕排版助手。将用户提供的 markdown 字幕文本转换为可直接在浏览器打开的完整 HTML 文件："
-    "输出以 <!DOCTYPE html> 开头的完整文档，样式全部内嵌在 <style> 中，"
-    "默认白底黑字、水平垂直居中、字号适中、行距舒适。"
-    "多轮对话时用户会提出字体大小、颜色等修改要求，请在最近一版 HTML 基础上修改后输出完整 HTML。"
-    "只输出 HTML 代码本身，不要任何解释，不要 markdown 代码围栏。";
-
-// LLM 可能用 ```html ... ``` 围栏包裹结果：剥围栏，无围栏则原样返回
-	std::string StripHtmlFence(const std::string& strContent)
-	{
-		const size_t nFenceHead = strContent.find("```");
-		if (nFenceHead == std::string::npos)
-			return strContent;
-	size_t nStart = strContent.find('\n', nFenceHead);
-	if (nStart == std::string::npos)
-		return strContent;
-	++nStart;
-	size_t nEnd = strContent.find("```", nStart);
-    if (nEnd == std::string::npos)
-        nEnd = strContent.size();
-    return strContent.substr(nStart, nEnd - nStart);
+// 编排者 system 提示：工具使用策略 + 知识库清单（工具定义由 SDK 注入）
+std::string buildOrchestratorInstructions(const KnowledgeBase& kb) {
+    std::ostringstream sys;
+    sys << "你是 DeepAgent，运行在 Graph_Saturn 图形工作区（U-DeepRT/DeepRT 引擎）的 AI 助手。\n"
+        << "你可以调用工具完成用户的图工程与资产生成需求。使用工具的策略：\n"
+        << "1. 用户询问系统能力或闲聊：直接回答（可介绍知识库中的工具 Node），不要调用工具。\n"
+        << "2. 用户需要生成图工程/资产：先调 list_knowledge_nodes 了解可用工具 Node，\n"
+        << "   再调 create_udrt（字幕类条目必须带 subtitle_text 与 style_prompt）。\n"
+        << "3. 用户要求修改已生成资产：调 generate_node_asset（kind=prompt）。\n"
+        << "4. 用户询问某节点状态：调 get_node_context。\n"
+        << "外部知识库当前条目：\n" << kb.toPromptText() << "\n"
+        << "始终用中文回答。生成类工具调用完成后，在最终回答中报告产出文件路径。\n";
+    return sys.str();
 }
 
 } // namespace
 
+// ------------------------------------------------------------------
+// Agent Loop 工具（持 AgentGraph 指针，转调公共执行器）
+// ------------------------------------------------------------------
+namespace {
+
+class ToolBase : public neograph::Tool {
+public:
+    explicit ToolBase(AgentGraph* owner) : owner_(owner) {}
+
+protected:
+    AgentGraph* owner_;
+};
+
+class ListKnowledgeNodesTool final : public ToolBase {
+public:
+    using ToolBase::ToolBase;
+
+    neograph::ChatTool get_definition() const override {
+        return {"list_knowledge_nodes",
+            "列出外部知识库中已登记的工具 Node 条目（id/名称/能力/输入输出）。"
+            "在决定创建图工程前应先调用本工具了解可用能力。",
+            neograph::json{{"type", "object"},
+                           {"properties", neograph::json::object()},
+                           {"required", neograph::json::array()}}};
+    }
+
+    std::string execute(const neograph::json& args) override {
+        (void)args;
+        return owner_->toolListKnowledgeNodes();
+    }
+
+    std::string get_name() const override { return "list_knowledge_nodes"; }
+};
+
+class CreateUdrtTool final : public ToolBase {
+public:
+    using ToolBase::ToolBase;
+
+    neograph::ChatTool get_definition() const override {
+        return {"create_udrt",
+            "根据知识库条目生成 .udrt 图工程文件并同时生成 HTML 资产。"
+            "参数：entry_id=知识库条目id；subtitle_text=字幕源文本（字幕类条目必填）；"
+            "style_prompt=样式要求（字体/字号/颜色等，可空）；"
+            "background=是否生成背景板并与字幕内容合成最终效果（可空，缺省按文本内容自动判断）。",
+            neograph::json{
+                {"type", "object"},
+                {"properties", {
+                    {"entry_id",      {{"type", "string"}, {"description", "知识库条目 id"}}},
+                    {"subtitle_text", {{"type", "string"}, {"description", "字幕源文本（markdown）"}}},
+                    {"style_prompt",  {{"type", "string"}, {"description", "样式要求（字体/字号/颜色等）"}}},
+                    {"background",    {{"type", "boolean"}, {"description", "是否启用背景板分支（可空=自动判断）"}}}
+                }},
+                {"required", neograph::json::array({"entry_id"})}}};
+    }
+
+    std::string execute(const neograph::json& args) override {
+        std::optional<bool> background;
+        if (args.contains("background") && args["background"].is_boolean())
+            background = args["background"].get<bool>();
+        return owner_->toolCreateUdrt(
+            args.value("entry_id", ""),
+            args.value("subtitle_text", ""),
+            args.value("style_prompt", ""),
+            background,
+            nullptr, nullptr, nullptr);
+    }
+
+    std::string get_name() const override { return "create_udrt"; }
+};
+
+class GenerateNodeAssetTool final : public ToolBase {
+public:
+    using ToolBase::ToolBase;
+
+    neograph::ChatTool get_definition() const override {
+        return {"generate_node_asset",
+            "为指定 GUID 的节点生成/更新资产。"
+            "kind=content 新建资产；kind=prompt 按修改指令调整（字体/字号/颜色等）。"
+            "background=是否生成背景板并合成（可空，缺省按文本内容自动判断）。",
+            neograph::json{
+                {"type", "object"},
+                {"properties", {
+                    {"guid", {{"type", "string"}, {"description", "节点 GUID"}}},
+                    {"kind", {{"type", "string"}, {"description", "content=新建; prompt=按指令修改"}}},
+                    {"text", {{"type", "string"}, {"description", "字幕源文本或修改指令"}}},
+                    {"background", {{"type", "boolean"}, {"description", "是否启用背景板分支（可空=自动判断）"}}}
+                }},
+                {"required", neograph::json::array({"guid", "kind", "text"})}}};
+    }
+
+    std::string execute(const neograph::json& args) override {
+        std::optional<bool> background;
+        if (args.contains("background") && args["background"].is_boolean())
+            background = args["background"].get<bool>();
+        return owner_->toolGenerateNodeAsset(
+            args.value("guid", ""),
+            args.value("kind", "content"),
+            args.value("text", ""),
+            background);
+    }
+
+    std::string get_name() const override { return "generate_node_asset"; }
+};
+
+class GetNodeContextTool final : public ToolBase {
+public:
+    using ToolBase::ToolBase;
+
+    neograph::ChatTool get_definition() const override {
+        return {"get_node_context",
+            "查看指定 GUID 节点的多轮上下文与执行状态。",
+            neograph::json{
+                {"type", "object"},
+                {"properties", {
+                    {"guid", {{"type", "string"}, {"description", "节点 GUID"}}}
+                }},
+                {"required", neograph::json::array({"guid"})}}};
+    }
+
+    std::string execute(const neograph::json& args) override {
+        return owner_->toolGetNodeContext(args.value("guid", ""));
+    }
+
+    std::string get_name() const override { return "get_node_context"; }
+};
+
+} // namespace
+
+// ------------------------------------------------------------------
+// 构造
+// ------------------------------------------------------------------
+
 AgentGraph::AgentGraph(const Config& config, LlmClient& llm, const KnowledgeBase& kb,
-                       const NodeCatalog& catalog, const UdrtCompiler& compiler)
-    : config_(config), llm_(llm), kb_(kb), catalog_(catalog), compiler_(compiler) {}
+                       const NodeCatalog& catalog, const UdrtCompiler& compiler,
+                       NodeContextStore& nodeContexts)
+    : config_(config), llm_(llm), kb_(kb), catalog_(catalog), compiler_(compiler),
+      nodeContexts_(nodeContexts) {}
+
+// ------------------------------------------------------------------
+// 工具执行器实现（Agent Loop 的 tool_calls 落到这里）
+// ------------------------------------------------------------------
+
+std::string AgentGraph::toolListKnowledgeNodes() const {
+    return kb_.entries().dump();
+}
+
+std::string AgentGraph::toolCreateUdrt(const std::string& entryId,
+                                       const std::string& subtitleText,
+                                       const std::string& stylePrompt,
+                                       std::optional<bool> background,
+                                       std::string* guidOut,
+                                       std::string* udrtFileOut,
+                                       std::string* htmlFileOut) {
+    const json* entry = kb_.find(entryId);
+    if (!entry) {
+        json knownIds = json::array();
+        for (const auto& e : kb_.entries()) knownIds.push_back(e.value("id", ""));
+        return json{{"error", "unknown entry_id: " + entryId},
+                    {"known_ids", knownIds}}.dump();
+    }
+
+    const json& tpl = entry->at("udrt_template");
+
+    // Plan：模板为准（确定性），保证连线/端口合法
+    json plan;
+    plan["nodes"] = tpl.value("nodes", json::array());
+    plan["links"] = tpl.value("links", json::array());
+
+    // props 覆盖：字幕文本/样式/API 配置（GUID 由编译器生成后回填）
+    for (auto& pn : plan["nodes"]) {
+        const json* cat = catalog_.node(pn.value("catalog", ""));
+        if (!cat) continue;
+        json props = cat->value("props", json::object());
+        auto merge = [&](const char* key, const std::string& v) {
+            if (v.empty() || !props.contains(key)) return;
+            props[key] = v;
+        };
+        merge("strContent", subtitleText);
+        merge("strPrompt", stylePrompt);
+        merge("strApiKey", config_.llm_api_key);
+        merge("strModel", config_.llm_model);
+        pn["props"] = props;
+    }
+
+    json udrt;
+    std::string cerr;
+    if (!compiler_.compile(plan, &udrt, &cerr)) {
+        return json{{"error", "compile failed: " + cerr}}.dump();
+    }
+    if (!compiler_.validate(udrt, &cerr)) {
+        return json{{"error", "validate failed: " + cerr}}.dump();
+    }
+
+    std::string guid;
+    if (!udrt["nodes"].empty())
+        guid = udrt["nodes"][0]["internal-data"].value("guid", std::string());
+    if (guidOut) *guidOut = guid;
+
+    std::string filePrefix = tpl.value("file_prefix", std::string("deepagent"));
+    std::string udrtPath =
+        UdrtCompiler::makeFilePath(config_.udrt_output_dir, filePrefix + "_" + guid.substr(0, 8));
+    if (!compiler_.writeFile(udrt, udrtPath, &cerr)) {
+        return json{{"error", cerr}}.dump();
+    }
+
+    // HTML 资产：子步管线化生成（可选背景板分支 ∥ LLM 内容分支 → 合成）。
+    // 见 docs/Node资产生成子步并发设计.md
+    std::string htmlFile;
+    if (!subtitleText.empty()) {
+        std::vector<std::string> toolGuids;
+        std::size_t ui = 0;
+        for (const auto& pn : plan["nodes"]) {
+            const json& un = ui < udrt["nodes"].size() ? udrt["nodes"][ui] : json();
+            ++ui;
+            if (pn.value("catalog", "") != entryId) continue;
+            std::string g = un.value("internal-data", json::object()).value("guid", std::string());
+            if (!g.empty()) toolGuids.push_back(g);
+        }
+        if (toolGuids.empty() && !guid.empty()) toolGuids.push_back(guid);
+
+        AssetRunnerConfig rc;
+        rc.api_key = config_.llm_api_key;
+        rc.base_url = config_.llm_base_url;
+        rc.model = config_.llm_model;
+        rc.system_prompt = kSubtitleSystemPrompt;
+        AssetGraphRunner runner(rc);
+
+        const bool wants_bg = wantsBackground(background, subtitleText, stylePrompt);
+        std::vector<AssetRequest> reqs;
+        for (const auto& g : toolGuids) {
+            AssetRequest req;
+            req.guid = g;
+            req.short_id = g.size() >= 8 ? g.substr(0, 8) : g;
+            req.user_text = subtitleText;
+            req.context = json{{"content", subtitleText}, {"style", stylePrompt}};
+            req.wants_background = wants_bg;
+            reqs.push_back(std::move(req));
+        }
+
+        json pipelineSchema = entry->value("asset_pipeline", json::object());
+        if (!pipelineSchema.contains("branches")) pipelineSchema = defaultSubtitlePipeline();
+
+        auto results = runner.run(
+            reqs, pipelineSchema,
+            [this](const std::string& g, const std::string& step, const std::string& state) {
+                if (m_activeSink && m_activeSink->onNodeState)
+                    m_activeSink->onNodeState(
+                        json{{"guid", g}, {"step", step}, {"state", state}});
+            });
+
+        for (const auto& r : results) {
+            if (r.ok && !r.final_html.empty()) {
+                htmlFile = udrtPath.substr(0, udrtPath.rfind('.')) + ".html";
+                std::ofstream ofs(htmlFile, std::ios::binary | std::ios::trunc);
+                if (ofs) ofs.write(r.final_html.data(), (std::streamsize)r.final_html.size());
+                break;
+            }
+        }
+    }
+
+    json ok{{"udrt_file", udrtPath},
+            {"guid", guid},
+            {"nodes", udrt["nodes"].size()},
+            {"connections", udrt["connections"].size()}};
+    if (!htmlFile.empty()) ok["html_file"] = htmlFile;
+    return ok.dump();
+}
+
+std::string AgentGraph::toolGenerateNodeAsset(const std::string& guid,
+                                              const std::string& kind,
+                                              const std::string& text,
+                                              std::optional<bool> background) {
+    if (guid.empty() || text.empty())
+        return json{{"error", "guid and text are required"}}.dump();
+
+    json messages;
+    std::string err;
+    if (!nodeContexts_.beginTurn(guid, kind, kSubtitleSystemPrompt, text, &messages, &err))
+        return json{{"error", err}}.dump();
+
+    // 子步管线：完整多轮上下文作为 content 分支输入；可选背景板分支并发合成
+    AssetRunnerConfig rc;
+    rc.api_key = config_.llm_api_key;
+    rc.base_url = config_.llm_base_url;
+    rc.model = config_.llm_model;
+    rc.system_prompt = kSubtitleSystemPrompt;
+    AssetGraphRunner runner(rc);
+
+    AssetRequest req;
+    req.guid = guid;
+    req.short_id = guid.size() >= 8 ? guid.substr(0, 8) : guid;
+    req.messages = messages;
+    req.context = json{{"content", text}, {"style", kind == "prompt" ? text : ""}};
+    req.wants_background = wantsBackground(background, text, "");
+
+    auto results = runner.run(
+        {std::move(req)}, defaultSubtitlePipeline(),
+        [this](const std::string& g, const std::string& step, const std::string& state) {
+            if (m_activeSink && m_activeSink->onNodeState)
+                m_activeSink->onNodeState(json{{"guid", g}, {"step", step}, {"state", state}});
+        });
+
+    const auto& r = results.front();
+    if (!r.ok || r.final_html.empty()) {
+        const std::string fail = r.error.empty() ? "empty pipeline result" : r.error;
+        nodeContexts_.failTurn(guid, fail);
+        return json{{"error", fail}}.dump();
+    }
+    nodeContexts_.completeTurn(guid, r.final_html);
+
+    return json{{"state", "done"}, {"html", r.final_html}, {"guid", guid}}.dump();
+}
+
+std::string AgentGraph::toolGetNodeContext(const std::string& guid) const {
+    json ctx = nodeContexts_.getContext(guid);
+    if (ctx.is_null()) return json{{"error", "context not found"}}.dump();
+    return ctx.dump();
+}
+
+// ------------------------------------------------------------------
+// run()：Agent Loop 主路径（LLM 自主工具调用），异常回退固定管线
+// ------------------------------------------------------------------
+
+std::string AgentGraph::run(const std::string& userMessage,
+                            const std::vector<ChatMessage>& history,
+                            const EventSink& sink, std::string* error) {
+    m_activeSink = &sink;
+    std::string reply;
+    try {
+        // 1. OpenAI 兼容 provider（DeepSeek）
+        neograph::llm::OpenAIProvider::Config pc;
+        pc.api_key = config_.llm_api_key;
+        pc.base_url = config_.llm_base_url;
+        pc.default_model = config_.llm_model;
+        pc.timeout_seconds = 180;
+        auto provider = neograph::llm::OpenAIProvider::create(pc);
+
+        // 2. 工具集（Agent Loop 中 LLM 自主调用）
+        std::vector<std::unique_ptr<neograph::Tool>> tools;
+        tools.push_back(std::make_unique<ListKnowledgeNodesTool>(this));
+        tools.push_back(std::make_unique<CreateUdrtTool>(this));
+        tools.push_back(std::make_unique<GenerateNodeAssetTool>(this));
+        tools.push_back(std::make_unique<GetNodeContextTool>(this));
+
+        // 3. Agent Loop（LLM 自主决定调用工具的次数与顺序，max_iterations 止损）
+        neograph::llm::Agent agent(std::move(provider), std::move(tools),
+                                   buildOrchestratorInstructions(kb_),
+                                   config_.llm_model);
+        agent.set_tool_detection_timeout_seconds(120);
+
+        std::vector<neograph::ChatMessage> messages;
+        for (const auto& h : history)
+            messages.push_back({h.role, h.content});
+        messages.push_back({"user", userMessage});
+
+        reply = agent.run_stream(messages,
+            [&](const std::string& token) {
+                if (sink.onToken) sink.onToken(token);
+            }, /*max_iterations=*/8);
+
+        if (reply.empty() && error) *error = "empty agent reply";
+    } catch (const std::exception& e) {
+        // Agent Loop 异常：回退旧固定管线
+        if (error) *error = std::string("agent loop failed, fallback: ") + e.what();
+        reply.clear();
+    }
+    m_activeSink = nullptr;
+
+    if (reply.empty())
+        reply = runLegacyPipeline(userMessage, history, sink, error);
+    return reply;
+}
+
+// ------------------------------------------------------------------
+// 旧固定管线（fallback：LLM tools 协议异常时回退）
+// ------------------------------------------------------------------
 
 json AgentGraph::analyzeIntent(const std::string& userMessage, std::string* llmError) {
     std::ostringstream sys;
@@ -63,20 +458,13 @@ json AgentGraph::analyzeIntent(const std::string& userMessage, std::string* llmE
         << kb_.toPromptText() << "\n\n"
         << "任务：判断用户的这条消息是否需要调用上述某个工具 Node（是否需要生成 .udrt 图工程文件）。\n"
         << "只输出一个 JSON 对象，不要输出其他文字，格式：\n"
-        << "{\"is_tool_task\": true|false, \"entry_id\": \"知识库条目id或null\", "
-        << "\"subtitle_text\": \"若消息中包含用户希望使用的字幕对白文本则原样摘出，否则为空字符串\", "
-        << "\"style_prompt\": \"若消息中包含对字幕样式/风格的额外要求（如字体、字号、颜色、加粗、描边、动画等）"
-        << "则浓缩为一条给字幕生成节点的修改指令（如\\\"字体：宋体；字号：36；颜色：红色\\\"），否则为空字符串\", "
-        << "\"reason\": \"一句话理由\"}\n"
-        << "规则：\n"
-        << "1. 只有当用户明确或隐含地需要知识库中某工具 Node 的能力时 is_tool_task 才为 true；\n"
-        << "2. entry_id 必须严格等于知识库条目的 id；普通闲聊/与工具无关的问题 is_tool_task 为 false、entry_id 为 null；\n"
-        << "3. 若用户想生成字幕 HTML / 字幕文件 / 网页字幕等，应选择字幕相关的工具 Node；\n"
-        << "4. style_prompt 只收集风格/字体/颜色等外观要求，不要混入字幕对白内容本身。";
-    std::vector<ChatMessage> messages = {
-        {"system", sys.str()},
-        {"user", userMessage},
-    };
+        << "{\"is_tool_task\": true|false, \"entry_id\": \"...\", "
+        << "\"subtitle_text\": \"...\", "
+        << "\"style_prompt\": \"...\", "
+        << "\"reason\": \"一句话理由\"}\n";
+    std::vector<ChatMessage> messages;
+    messages.push_back({"system", sys.str()});
+    messages.push_back({"user", userMessage});
     std::string err;
     std::string raw = llm_.invoke(messages, &err, /*temperature=*/0.2);
     if (raw.empty()) {
@@ -121,9 +509,9 @@ json AgentGraph::templatePlan(const json& entry) const {
 bool AgentGraph::planGraph(const json& entry, const json& intent,
                            const std::string& userMessage, json* planIr,
                            bool* usedTemplate) {
+    (void)intent;
     *usedTemplate = false;
 
-    // Ask the LLM for a Plan IR referencing catalog keys / semantic ports only.
     const json& tpl = entry.at("udrt_template");
     json catalogBrief = json::array();
     for (const auto& pn : tpl["nodes"]) {
@@ -142,17 +530,15 @@ bool AgentGraph::planGraph(const json& entry, const json& intent,
         << "只输出 JSON：{\"nodes\": [{\"key\": \"实例名\", \"catalog\": \"目录key\"}], "
         << "\"links\": [{\"from\": \"实例名:输出端口\", \"to\": \"实例名:输入端口\"}]}\n"
         << "要求：与模板等价即可，不得引入目录之外的节点或端口。";
-    std::vector<ChatMessage> messages = {
-        {"system", sys.str()},
-        {"user", userMessage},
-    };
+    std::vector<ChatMessage> messages;
+    messages.push_back({"system", sys.str()});
+    messages.push_back({"user", userMessage});
     std::string err;
     std::string raw = llm_.invoke(messages, &err, /*temperature=*/0.2);
     json plan;
     bool ok = false;
     if (!raw.empty() && extractJsonObject(raw, &plan)) {
         if (plan.contains("nodes") && plan.contains("links")) {
-            // pre-validate: every catalog key must exist
             ok = true;
             for (const auto& pn : plan["nodes"]) {
                 if (!catalog_.node(pn.value("catalog", ""))) {
@@ -171,19 +557,22 @@ bool AgentGraph::planGraph(const json& entry, const json& intent,
     return true;
 }
 
-std::string AgentGraph::run(const std::string& userMessage,
-                            const std::vector<ChatMessage>& history,
-                            const EventSink& sink, std::string* error) {
-    auto status = [&sink](const std::string& s) {
+// 旧固定管线主体（fallback：LLM tools 协议异常时回退）
+std::string AgentGraph::makeRelative(const std::string& absolute) const {
+    std::string a = absolute;
+    std::string b = config_.exe_dir;
+    for (auto& ch : a) if (ch == '/') ch = '\\';
+    for (auto& ch : b) if (ch == '/') ch = '\\';
+    if (!b.empty() && b.back() != '\\') b += '\\';
+    if (a.rfind(b, 0) == 0) return a.substr(b.size());
+    return absolute;
+}
+
+std::string AgentGraph::runLegacyPipeline(const std::string& userMessage,
+                                          const std::vector<ChatMessage>& history,
+                                          const EventSink& sink, std::string* error) {
+    auto status = [&](const std::string& s) {
         if (sink.onStatus) sink.onStatus(s);
-    };
-    // 协议中传递相对路径（相对公共部署目录 exe_dir）；UI 显示用 absolute_path
-    auto makeRelative = [this](const std::string& absPath) -> std::string {
-        std::string base = config_.exe_dir + "\\";
-        if (absPath.size() > base.size() &&
-            _strnicmp(absPath.c_str(), base.c_str(), base.size()) == 0)
-            return absPath.substr(base.size());
-        return absPath;
     };
 
     // ---- Step 1: analyze_intent (LLM + knowledge base) ----
@@ -204,10 +593,10 @@ std::string AgentGraph::run(const std::string& userMessage,
     }
 
     if (!entry) {
-        // ---- plain chat path ----
+        // ---- 普通对话路径 ----
         status("未检测到需要调用的工具 Node，进入普通对话");
         std::ostringstream sys;
-        sys << "你是 DeepAgent，运行在 Graph_Saturn 图形工作区的 AI 助手。"
+        sys << "你是 DeepAgent，运行在 Graph_Saturn 图形工作区（U-DeepRT/DeepRT 引擎）的 AI 助手。"
             << "你可以根据需求生成工具 Node 的 .udrt 图工程文件。当前消息未触发工具调用，请自然地回答用户。"
             << "如用户询问你能做什么，可介绍：知识库中已登记的工具 Node 能力（如根据字幕文本调用 LLM 生成字幕 HTML 文件的工具 Node）。";
         std::vector<ChatMessage> messages;
@@ -232,14 +621,7 @@ std::string AgentGraph::run(const std::string& userMessage,
     planGraph(*entry, intent, userMessage, &planIr, &usedTemplate);
     if (usedTemplate) status("LLM Plan 无效，回退知识库内置模板");
 
-    // ---- Step 4: compile_udrt ----
-    // props overrides aligned with subtitle_gen::CDyProps:
-    //   strContent  <- user subtitle text (intent analysis)
-    //   strPrompt   <- style/font requirements extracted from the prompt
-    //   strApiKey   <- DeepAgent's own LLM api key (config/.env DEEPSEEK_API_KEY)
-    //   strModel    <- DeepAgent's own LLM model   (config/.env DEEPSEEK_MODEL)
-    // Only keys declared in the node catalog are set; the compiler merges
-    // these overrides on top of the catalog defaults.
+    // ---- Step 4: compile_udrt (props override: subtitle text / style) ----
     json plan = planIr;
     std::string subtitleText = intent.value("subtitle_text", std::string());
     std::string stylePrompt = intent.value("style_prompt", std::string());
@@ -291,8 +673,8 @@ std::string AgentGraph::run(const std::string& userMessage,
     if (sink.onUdrt) {
         json payload;
         payload["type"] = "udrt";
-        payload["file"] = makeRelative(path);              // 协议中传相对路径（相对公共部署目录）
-        payload["absolute_path"] = path;                   // UI 显示用绝对路径
+        payload["file"] = makeRelative(path);
+        payload["absolute_path"] = path;
         payload["name"] = entry->value("name", "");
         payload["module_id"] = entry->value("module_id", "");
         payload["node_count"] = udrt["nodes"].size();
@@ -301,58 +683,48 @@ std::string AgentGraph::run(const std::string& userMessage,
         sink.onUdrt(payload);
     }
 
-    // ---- Step 5.5: 资产生成（字幕场景：对话中直接产出 HTML 资产，无需等 U-DeepRT 运行节点）----
-    if (entry->value("id", "") == "saturn_subtitle_html" && !subtitleText.empty()) {
-        status("正在生成 HTML 资产…");
+    // HTML 资产：字幕文本 + 样式指令一次性生成（与 udrt 同目录同名关联）
+    std::string htmlFile;
+    std::string htmlSubtitle = intent.value("subtitle_text", std::string());
+    std::string htmlStyle = intent.value("style_prompt", std::string());
+    if (!htmlSubtitle.empty()) {
         std::vector<ChatMessage> gen;
         gen.push_back({"system", kSubtitleSystemPrompt});
-        std::string userText = subtitleText;
-        if (!stylePrompt.empty()) userText += "\n\n样式要求：" + stylePrompt;
+        std::string userText = htmlSubtitle;
+        if (!htmlStyle.empty()) userText += "\n\n样式要求：" + htmlStyle;
         gen.push_back({"user", userText});
         std::string htmlErr;
         std::string html = StripHtmlFence(llm_.invoke(gen, &htmlErr, /*temperature=*/0.3));
         if (!html.empty()) {
-            // 资产以 GUID 命名，与 udrt 同目录（公共部署目录），U-DeepRT 中的节点
-            // 按 guid 即可定位消费（相对路径 udrt\{guid}.html）
-            std::string guid = udrt["nodes"][0]["internal-data"].value("guid", std::string());
-            std::string assetPath = config_.udrt_output_dir + "\\" + guid + ".html";
-            std::ofstream ofs(assetPath, std::ios::binary | std::ios::trunc);
+            htmlFile = path.substr(0, path.rfind('.')) + ".html";
+            std::ofstream ofs(htmlFile, std::ios::binary | std::ios::trunc);
             if (ofs) ofs.write(html.data(), (std::streamsize)html.size());
-            ofs.close();
-
-            status("已生成 HTML 资产：" + assetPath);
-            if (sink.onAsset) {
-                json asset{{"type", "html"},
-                           {"file", makeRelative(assetPath)},
-                           {"absolute_path", assetPath},
-                           {"guid", guid}, {"version", 1}};
-                sink.onAsset(asset);
-            }
-        } else {
-            status("HTML 资产生成失败：" + (htmlErr.empty() ? "empty reply" : htmlErr));
         }
     }
 
-    // ---- Step 6: reply (streaming) ----
-    status("正在生成回复…");
-    std::ostringstream summary;
-    summary << "本次任务执行结果：\n"
-            << "- 选中的工具 Node: " << statusText(*entry) << "\n"
-            << "- 知识库条目: " << entry->value("id", "") << "\n"
-            << "- 生成的 udrt 文件: " << path << "\n"
-            << "- 节点数: " << udrt["nodes"].size() << ", 连接数: " << udrt["connections"].size() << "\n"
-            << "- 节点清单:";
-    for (const auto& n : udrt["nodes"]) {
-        summary << " " << n["internal-data"]["model_comment"].get<std::string>()
-                << "(" << n["internal-data"]["model_name"].get<std::string>() << ";";
+    status(htmlFile.empty() ? "已生成 udrt 文件：" + path
+                            : "已生成 udrt 与 HTML 资产：" + htmlFile);
+    if (sink.onAsset) {
+        json asset{{"type", "html"},
+                   {"file", makeRelative(htmlFile.empty() ? path : htmlFile)},
+                   {"absolute_path", htmlFile.empty() ? path : htmlFile},
+                   {"guid", std::string()},
+                   {"version", 1}};
+        sink.onAsset(asset);
     }
-    summary << "\n- udrt JSON:\n" << udrt.dump(2) << "\n";
+
+    // ---- Step 6: reply (streaming) ----
+    std::ostringstream summary;
+    summary << "已完成处理。产出：\n"
+            << "- udrt 文件: " << path << "\n"
+            << "- 节点数: " << udrt["nodes"].size() << ", 连接数: " << udrt["connections"].size() << "\n";
+    if (!htmlFile.empty()) summary << "- HTML 资产: " << htmlFile << "\n";
 
     std::ostringstream sys;
-    sys << "你是 DeepAgent，Graph_Saturn 图形工作区的 AI 助手。工具调用已完成，"
-        << "请用中文向用户简洁汇报：选择了哪个工具 Node、为什么（结合知识库条目描述）、"
-        << "udrt 文件保存到了哪里、包含哪些节点与连接，并提示可以在 U-DeepRT 中打开该工程。"
-        << "不要逐字罗列 JSON 全文。\n\n" << summary.str();
+    sys << "你是 DeepAgent，运行在 Graph_Saturn 图形工作区（U-DeepRT/DeepRT 引擎）的 AI 助手。"
+        << "当前流程已完成固定管线处理，请自然地回答用户。\n"
+        << "处理摘要：\n" << summary.str();
+
     std::vector<ChatMessage> messages;
     messages.push_back({"system", sys.str()});
     for (const auto& m : history) messages.push_back(m);
