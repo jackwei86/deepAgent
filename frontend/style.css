@@ -235,12 +235,18 @@ html, body { height: 100%; font-family: "Segoe UI", "Microsoft YaHei", system-ui
 .udrt-card .uc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .udrt-card .uc-title { font-weight: 700; color: #3730a3; }
 .udrt-card .uc-meta { color: var(--muted); font-size: 12px; margin-top: 4px; line-height: 1.6; }
-.udrt-card .uc-actions { display: flex; gap: 8px; margin-top: 10px; }
+.udrt-card .uc-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .udrt-card button {
     padding: 6px 12px; font-size: 12.5px; border-radius: 8px; cursor: pointer;
     border: 1px solid var(--border); background: #fff;
 }
 .udrt-card button:hover { border-color: var(--accent); color: var(--accent); }
+.udrt-card button.optimize { border-color: #a7f3d0; background: #ecfdf5; color: #047857; }
+.udrt-card button.optimize:hover { border-color: #10b981; color: #059669; background: #d1fae5; }
+/* 资产卡片内嵌预览（sandbox iframe，样式仍可完整渲染，禁脚本） */
+.asset-preview { margin-top: 10px; border: 1px solid #c7d2fe; border-radius: 10px; overflow: hidden; background: #fff; }
+.asset-preview iframe { display: block; width: 100%; height: 240px; border: 0; background: #fff; }
+.asset-preview.collapsed { display: none; }
 .udrt-card details { margin-top: 10px; }
 .udrt-card summary { cursor: pointer; color: var(--accent); font-size: 12.5px; }
 .udrt-card pre {

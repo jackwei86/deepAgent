@@ -53,7 +53,9 @@ public:
                                std::string* guidOut, std::string* udrtFileOut,
                                std::string* htmlFileOut);
     std::string toolGenerateNodeAsset(const std::string& guid, const std::string& kind,
-                                      const std::string& text, std::optional<bool> background);
+                                      const std::string& text, std::optional<bool> background,
+                                      const std::string& outputFile = {});
+    std::string toolReviewAsset(const std::string& path) const;
     std::string toolGetNodeContext(const std::string& guid) const;
 
 private:
@@ -77,6 +79,9 @@ private:
     const UdrtCompiler& compiler_;
     NodeContextStore& nodeContexts_;
     const EventSink* m_activeSink = nullptr;   // run() 期间有效，工具执行器用于发事件
+    // P3: create_udrt 进程内缓存（相同参数不重复调 LLM）
+    std::string m_lastCreateUdrtHash;
+    std::string m_lastCreateUdrtResult;
 };
 
 } // namespace deepagent

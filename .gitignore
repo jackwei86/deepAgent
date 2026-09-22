@@ -4,6 +4,7 @@ x64/
 Debug/
 Release/
 *.obj
+*.exe
 *.pdb
 *.ilk
 *.exp
@@ -35,4 +36,5 @@ backend/asset_feature_test.exe
 backend/asset_test_out/
 backend/sqlite3.obj
 third_party/sqlite3/*.obj
+*.exe
 third_party/sqlite3/*.pdb

@@ -50,19 +50,47 @@ bool splitPortRef(const std::string& ref, std::string* nodeKey, std::string* por
     return true;
 }
 
+// P2: 结构化诊断（path/expected/actual/hint）——Agent Loop 将其回填给 LLM 自修复
+void emitError(std::string* error, json* detailed,
+               const std::string& msg, const std::string& path,
+               const std::string& expected, const std::string& actual,
+               const std::string& hint = {},
+               json knownCatalogs = {}) {
+    if (error) *error = msg;
+    if (detailed) {
+        json d{{"error", msg}, {"path", path}, {"expected", expected}, {"actual", actual}};
+        if (!hint.empty()) d["hint"] = hint;
+        if (knownCatalogs.is_array()) d["known_catalogs"] = knownCatalogs;
+        *detailed = std::move(d);
+    }
+}
+
 } // namespace
 
 UdrtCompiler::UdrtCompiler(const NodeCatalog& catalog) : catalog_(catalog) {}
 
-bool UdrtCompiler::compile(const json& planIr, json* udrt, std::string* error) const {
+// 已知 catalog key 清单（P2: unknown catalog 时回填给 LLM 的合法值域）
+static json knownCatalogKeys(const NodeCatalog& catalog) {
+    json keys = json::array();
+    for (const auto& k : catalog.catalogKeys()) keys.push_back(k);
+    return keys;
+}
+
+bool UdrtCompiler::compile(const json& planIr, json* udrt, std::string* error,
+                           json* detailedError) const {
     if (!planIr.is_object()) {
-        if (error) *error = "plan IR is not an object";
+        emitError(error, detailedError, "plan IR is not an object", "/",
+                  "JSON object", planIr.type_name(),
+                  "Plan IR 必须是 {\"nodes\": [...], \"links\": [...]} 形式的对象");
         return false;
     }
     const auto& planNodes = planIr.value("nodes", json::array());
     const auto& links = planIr.value("links", json::array());
     if (!planNodes.is_array() || planNodes.empty()) {
-        if (error) *error = "plan IR has no nodes";
+        emitError(error, detailedError, "plan IR has no nodes", "/nodes",
+                  "non-empty array of {key, catalog}",
+                  planNodes.is_array() ? "empty array" : planNodes.type_name(),
+                  "nodes 为空：请至少放置一个节点（可参考 template 的 nodes）");
         return false;
     }
 
@@ -75,11 +103,21 @@ bool UdrtCompiler::compile(const json& planIr, json* udrt, std::string* error) c
         std::string catKey = pn.value("catalog", "");
         const json* cat = catalog_.node(catKey);
         if (!cat) {
-            if (error) *error = "unknown catalog key in plan: " + catKey;
+            emitError(error, detailedError,
+                      "unknown catalog key in plan: " + catKey,
+                      "/nodes[" + std::to_string(id) + "]/catalog",
+                      "one of known_catalogs", catKey,
+                      "catalog key 必须取自 known_catalogs；"
+                      "先调 list_knowledge_nodes 获取合法清单",
+                      knownCatalogKeys(catalog_));
             return false;
         }
         if (keyToId.count(key)) {
-            if (error) *error = "duplicate plan node key: " + key;
+            emitError(error, detailedError,
+                      "duplicate plan node key: " + key,
+                      "/nodes[" + std::to_string(id) + "]/key",
+                      "unique instance key", key,
+                      "key 是实例名，同一 Plan 内不得重复；请重命名其中一个");
             return false;
         }
         keyToId[key] = id;
@@ -117,34 +155,60 @@ bool UdrtCompiler::compile(const json& planIr, json* udrt, std::string* error) c
 
     // 2. resolve semantic links to numeric port indexes
     json connections = json::array();
+    int linkIdx = 0;
     for (const auto& link : links) {
+        const std::string idx = std::to_string(linkIdx);
         std::string from = link.value("from", "");
         std::string to = link.value("to", "");
         std::string fromNode, fromPort, toNode, toPort;
         if (!splitPortRef(from, &fromNode, &fromPort) ||
             !splitPortRef(to, &toNode, &toPort)) {
-            if (error) *error = "bad port reference in link: " + from + " -> " + to;
+            emitError(error, detailedError,
+                      "bad port reference in link: " + from + " -> " + to,
+                      "/links[" + idx + "]",
+                      "{\"from\": \"nodeKey:outPort\", \"to\": \"nodeKey:inPort\"}",
+                      from + " -> " + to,
+                      "端口引用必须是 \"实例名:端口名\" 两段式，冒号分隔");
             return false;
         }
         if (!keyToId.count(fromNode) || !keyToId.count(toNode)) {
-            if (error) *error = "link references unknown node key: " + from + " -> " + to;
+            std::string missing = keyToId.count(fromNode) ? toNode : fromNode;
+            json knownKeys = json::array();
+            for (const auto& [k, v] : keyToId) knownKeys.push_back(k);
+            emitError(error, detailedError,
+                      "link references unknown node key: " + from + " -> " + to,
+                      "/links[" + idx + "]",
+                      "declared node key (one of /nodes[].key)", missing,
+                      "link 只能引用 nodes 数组中已声明的实例 key",
+                      std::move(knownKeys));
             return false;
         }
         int outIdx = -1, inIdx = -1;
         const json* outCat = nullptr;
         const json* inCat = nullptr;
         if (!catalog_.resolvePort(planNodes, fromNode, fromPort, &outIdx, &outCat)) {
-            if (error) *error = "cannot resolve output port: " + from;
+            emitError(error, detailedError,
+                      "cannot resolve output port: " + from,
+                      "/links[" + idx + "]/from",
+                      "output port of " + fromNode, fromPort,
+                      "该节点的输出端口名不合法；可用的语义端口见其 catalog 的 "
+                      "output_ports（context.catalogs 已列出）");
             return false;
         }
         if (!catalog_.resolvePort(planNodes, toNode, toPort, &inIdx, &inCat)) {
-            if (error) *error = "cannot resolve input port: " + to;
+            emitError(error, detailedError,
+                      "cannot resolve input port: " + to,
+                      "/links[" + idx + "]/to",
+                      "input port of " + toNode, toPort,
+                      "该节点的输入端口名不合法；可用的语义端口见其 catalog 的 "
+                      "input_ports（context.catalogs 已列出）");
             return false;
         }
         connections.push_back({{"inNodeId", keyToId[toNode]},
                                {"inPortIndex", inIdx},
                                {"outNodeId", keyToId[fromNode]},
                                {"outPortIndex", outIdx}});
+        ++linkIdx;
     }
 
     json doc;
@@ -158,53 +222,81 @@ bool UdrtCompiler::compile(const json& planIr, json* udrt, std::string* error) c
     return true;
 }
 
-bool UdrtCompiler::validate(const json& udrt, std::string* error) const {
+bool UdrtCompiler::validate(const json& udrt, std::string* error,
+                            json* detailedError) const {
     if (!udrt.is_object()) {
-        if (error) *error = "udrt is not an object";
+        emitError(error, detailedError, "udrt is not an object", "/",
+                  "JSON object", udrt.type_name());
         return false;
     }
     auto nodesIt = udrt.find("nodes");
     auto connIt = udrt.find("connections");
     if (nodesIt == udrt.end() || !nodesIt->is_array() || nodesIt->empty()) {
-        if (error) *error = "udrt has no nodes";
+        emitError(error, detailedError, "udrt has no nodes", "/nodes",
+                  "non-empty array",
+                  nodesIt == udrt.end() ? "missing" : std::string(nodesIt->type_name()));
         return false;
     }
     if (connIt == udrt.end() || !connIt->is_array()) {
-        if (error) *error = "udrt has no connections array";
+        emitError(error, detailedError, "udrt has no connections array", "/connections",
+                  "array",
+                  connIt == udrt.end() ? "missing" : std::string(connIt->type_name()));
         return false;
     }
     std::set<int> ids;
+    size_t ni = 0;
     for (const auto& n : *nodesIt) {
+        const std::string at = std::to_string(ni);
         if (!n.contains("id") || !n["id"].is_number_integer()) {
-            if (error) *error = "node without integer id";
+            emitError(error, detailedError, "node without integer id",
+                      "/nodes[" + at + "]/id", "integer",
+                      n.contains("id") ? std::string(n["id"].type_name()) : "missing");
             return false;
         }
         int nid = n["id"].get<int>();
         if (!ids.insert(nid).second) {
-            if (error) *error = "duplicate node id: " + std::to_string(nid);
+            emitError(error, detailedError, "duplicate node id: " + std::to_string(nid),
+                      "/nodes[" + at + "]/id", "unique integer id",
+                      std::to_string(nid));
             return false;
         }
         const json& internal = n.value("internal-data", json::object());
         std::string modelName = internal.value("model_name", "");
         if (!isValidHexModuleId(modelName)) {
-            if (error) *error = "node " + std::to_string(nid) + " has invalid hex model_name: " + modelName;
+            emitError(error, detailedError,
+                      "node " + std::to_string(nid) + " has invalid hex model_name: " + modelName,
+                      "/nodes[" + at + "]/internal-data/model_name",
+                      "\"0x\" + 8 hex digits (10 chars total)", modelName,
+                      "model_name 是引擎模块注册的十六进制 ID，取自目录默认值，"
+                      "Plan IR 不应覆盖它");
             return false;
         }
         if (!n.contains("position") || !n["position"].is_object()) {
-            if (error) *error = "node " + std::to_string(nid) + " missing position";
+            emitError(error, detailedError,
+                      "node " + std::to_string(nid) + " missing position",
+                      "/nodes[" + at + "]/position", "object {x, y}", "missing");
             return false;
         }
+        ++ni;
     }
+    size_t ci = 0;
     for (const auto& c : *connIt) {
         int inId = c.value("inNodeId", -1), outId = c.value("outNodeId", -1);
         if (!ids.count(inId) || !ids.count(outId)) {
-            if (error) *error = "connection references unknown node id";
+            emitError(error, detailedError, "connection references unknown node id",
+                      "/connections[" + std::to_string(ci) + "]",
+                      "existing node ids",
+                      "inNodeId=" + std::to_string(inId) +
+                          ", outNodeId=" + std::to_string(outId));
             return false;
         }
         if (!c.contains("inPortIndex") || !c.contains("outPortIndex")) {
-            if (error) *error = "connection missing port index";
+            emitError(error, detailedError, "connection missing port index",
+                      "/connections[" + std::to_string(ci) + "]",
+                      "inPortIndex + outPortIndex integers", "missing");
             return false;
         }
+        ++ci;
     }
     return true;
 }

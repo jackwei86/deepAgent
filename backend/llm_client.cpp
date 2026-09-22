@@ -1,6 +1,7 @@
 #include "llm_client.h"
 
 #include <cstring>
+#include <map>
 #include <mutex>
 #include <sstream>
 #include <vector>
@@ -115,8 +116,65 @@ std::string deltaContent(const json& j) {
     return content->get<std::string>();
 }
 
-} // namespace
+// 流式 tool_calls 累积器：按 index 拼接 id/name/arguments 分片
+struct StreamedToolCalls {
+    struct Entry {
+        std::string id, name, arguments;
+    };
+    std::map<int, Entry> byIndex;
 
+    void feed(const json& payload) {
+        if (!payload.is_object()) return;
+        auto choices = payload.find("choices");
+        if (choices == payload.end() || !choices->is_array() || choices->empty()) return;
+        const json& c0 = (*choices)[0];
+        auto delta = c0.find("delta");
+        if (delta == c0.end() || !delta->is_object()) return;
+        auto tcs = delta->find("tool_calls");
+        if (tcs == delta->end() || !tcs->is_array()) return;
+        for (const auto& tc : *tcs) {
+            if (!tc.is_object()) continue;
+            int index = 0;
+            if (tc.contains("index") && tc["index"].is_number_integer())
+                index = tc["index"].get<int>();
+            Entry& e = byIndex[index];
+            if (tc.contains("id") && tc["id"].is_string() && !tc["id"].get<std::string>().empty())
+                e.id = tc["id"].get<std::string>();
+            if (tc.contains("function") && tc["function"].is_object()) {
+                const json& fn = tc["function"];
+                if (fn.contains("name") && fn["name"].is_string() &&
+                    !fn["name"].get<std::string>().empty())
+                    e.name = fn["name"].get<std::string>();
+                if (fn.contains("arguments") && fn["arguments"].is_string())
+                    e.arguments += fn["arguments"].get<std::string>();
+            }
+        }
+    }
+
+    // OpenAI 非流式协议形态（供回传给请求方）
+    json toJsonArray() const {
+        json arr = json::array();
+        for (const auto& [idx, e] : byIndex) {
+            arr.push_back({{"id", e.id},
+                           {"type", "function"},
+                           {"function", {{"name", e.name}, {"arguments", e.arguments}}}});
+        }
+        return arr;
+    }
+};
+
+// choices[0].finish_reason（可能为 null / 缺失）
+std::string streamFinishReason(const json& payload) {
+    if (!payload.is_object()) return {};
+    auto choices = payload.find("choices");
+    if (choices == payload.end() || !choices->is_array() || choices->empty()) return {};
+    const json& c0 = (*choices)[0];
+    auto fr = c0.find("finish_reason");
+    if (fr == c0.end() || !fr->is_string()) return {};
+    return fr->get<std::string>();
+}
+
+} // namespace
 LlmClient::LlmClient(const Config& config) : config_(config) {}
 
 std::string LlmClient::invoke(const std::vector<ChatMessage>& messages, std::string* error,
@@ -143,16 +201,83 @@ std::string LlmClient::request(const std::vector<ChatMessage>& messages, bool st
         if (error) *error = "DeepSeek API key not configured (config/.env DEEPSEEK_API_KEY)";
         return {};
     }
+    json body = buildBody(config_, messages, stream, temperature);
+    std::string rawBody;
+    if (!sendChat(body, stream, onToken, &rawBody, error)) return {};
 
+    std::string full;
+    if (!stream) {
+        try {
+            json j = json::parse(rawBody);
+            auto choices = j.find("choices");
+            if (choices != j.end() && choices->is_array() && !choices->empty()) {
+                auto message = (*choices)[0].find("message");
+                if (message != (*choices)[0].end()) {
+                    auto content = message->find("content");
+                    if (content != message->end() && content->is_string()) {
+                        full = content->get<std::string>();
+                    }
+                }
+            }
+        } catch (const std::exception&) {
+            if (error) *error = "LLM returned non-JSON body";
+        }
+    } else {
+        full = rawBody;  // 流式：rawBody 承载累积 content
+    }
+    if (full.empty() && error) error->clear();
+    return full;
+}
+
+nlohmann::json LlmClient::postChatJson(const nlohmann::json& body, std::string* error) {
+    if (!config_.llmConfigured()) {
+        if (error) *error = "DeepSeek API key not configured (config/.env DEEPSEEK_API_KEY)";
+        return nullptr;
+    }
+    std::string rawBody;
+    if (!sendChat(body, /*stream=*/false, nullptr, &rawBody, error)) return nullptr;
+    try {
+        return json::parse(rawBody);
+    } catch (const std::exception&) {
+        if (error) *error = "LLM returned non-JSON body";
+        return nullptr;
+    }
+}
+
+std::string LlmClient::postChatStream(const nlohmann::json& body,
+                                      const std::function<void(const std::string&)>& onDelta,
+                                      std::string* error,
+                                      nlohmann::json* toolCallsOut,
+                                      std::string* finishReasonOut) {
+    if (!config_.llmConfigured()) {
+        if (error) *error = "DeepSeek API key not configured (config/.env DEEPSEEK_API_KEY)";
+        return {};
+    }
+    std::string accumulated;
+    auto sink = [&](const std::string& delta) {
+        accumulated += delta;
+        if (onDelta) onDelta(delta);
+    };
+    std::string rawBody;
+    if (!sendChat(body, /*stream=*/true, sink, &rawBody, error, toolCallsOut, finishReasonOut))
+        return {};
+    // rawBody 承载累积 content（与 request 流式路径一致）
+    return rawBody.empty() ? accumulated : rawBody;
+}
+
+bool LlmClient::sendChat(const nlohmann::json& body, bool stream,
+                         const std::function<void(const std::string&)>& onDelta,
+                         std::string* rawBody, std::string* error,
+                         nlohmann::json* toolCallsOut, std::string* finishReasonOut) {
     bool https = false;
     std::wstring host;
     int port = 0;
     if (!splitBaseUrl(config_.llm_base_url, https, host, port)) {
         if (error) *error = "invalid DEEPSEEK_BASE_URL";
-        return {};
+        return false;
     }
 
-    std::string body = buildBody(config_, messages, stream, temperature).dump();
+    std::string wire = body.dump();
 
     std::wstring wpath = toWide(config_.llm_path);
     std::wstring headers = toWide(
@@ -161,13 +286,13 @@ std::string LlmClient::request(const std::vector<ChatMessage>& messages, bool st
         "Authorization: Bearer " + config_.llm_api_key + "\r\n");
 
     HINTERNET session = nullptr, connectH = nullptr, requestH = nullptr;
-    std::string result;
+    bool ok = false;
     auto fail = [&](const std::string& msg) {
         if (error && error->empty()) *error = msg;
         if (requestH) WinHttpCloseHandle(requestH);
         if (connectH) WinHttpCloseHandle(connectH);
         if (session) WinHttpCloseHandle(session);
-        return std::string();
+        return false;
     };
 
     session = WinHttpOpen(L"DeepAgent/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
@@ -193,8 +318,8 @@ std::string LlmClient::request(const std::vector<ChatMessage>& messages, bool st
 
     // WinHTTP sends the buffer verbatim: pass UTF-8 JSON bytes directly.
     BOOL sent = WinHttpSendRequest(requestH, headers.c_str(), (DWORD)-1,
-                                   (LPVOID)body.data(), (DWORD)body.size(),
-                                   (DWORD)body.size(), 0);
+                                   (LPVOID)wire.data(), (DWORD)wire.size(),
+                                   (DWORD)wire.size(), 0);
     if (!sent) return fail("WinHttpSendRequest failed: " + std::to_string(GetLastError()));
     if (!WinHttpReceiveResponse(requestH, nullptr)) {
         return fail("WinHttpReceiveResponse failed: " + std::to_string(GetLastError()));
@@ -220,8 +345,10 @@ std::string LlmClient::request(const std::vector<ChatMessage>& messages, bool st
     }
 
     SseParser parser;
-    std::string full;
-    std::string rawBody;   // non-stream mode: accumulate the plain JSON body
+    std::string full;      // 流式：累积 content
+    std::string raw;       // 非流式：完整响应体
+    StreamedToolCalls streamedTools;
+    std::string lastFinish;
     for (;;) {
         DWORD avail = 0;
         if (!WinHttpQueryDataAvailable(requestH, &avail)) break;
@@ -231,7 +358,7 @@ std::string LlmClient::request(const std::vector<ChatMessage>& messages, bool st
         if (!WinHttpReadData(requestH, buf.data(), avail, &read) || read == 0) break;
 
         if (!stream) {
-            rawBody.append(buf.data(), read);
+            raw.append(buf.data(), read);
             continue;
         }
 
@@ -244,7 +371,12 @@ std::string LlmClient::request(const std::vector<ChatMessage>& messages, bool st
                 std::string delta = deltaContent(j);
                 if (!delta.empty()) {
                     full += delta;
-                    if (onToken) onToken(delta);
+                    if (onDelta) onDelta(delta);
+                }
+                if (toolCallsOut || finishReasonOut) {
+                    streamedTools.feed(j);
+                    std::string fr = streamFinishReason(j);
+                    if (!fr.empty()) lastFinish = fr;
                 }
             } catch (const std::exception&) {
                 // ignore malformed keep-alive fragments
@@ -252,29 +384,17 @@ std::string LlmClient::request(const std::vector<ChatMessage>& messages, bool st
         }
     }
 
-    if (!stream) {
-        try {
-            json j = json::parse(rawBody);
-            auto choices = j.find("choices");
-            if (choices != j.end() && choices->is_array() && !choices->empty()) {
-                auto message = (*choices)[0].find("message");
-                if (message != (*choices)[0].end()) {
-                    auto content = message->find("content");
-                    if (content != message->end() && content->is_string()) {
-                        full = content->get<std::string>();
-                    }
-                }
-            }
-        } catch (const std::exception&) {
-            if (error) *error = "LLM returned non-JSON body";
-        }
-    }
-
     WinHttpCloseHandle(requestH);
     WinHttpCloseHandle(connectH);
     WinHttpCloseHandle(session);
-    if (full.empty() && error) error->clear();
-    return full;
+
+    if (stream) *rawBody = full;
+    else *rawBody = raw;
+    if (toolCallsOut) *toolCallsOut = streamedTools.toJsonArray();
+    if (finishReasonOut) *finishReasonOut = lastFinish;
+    ok = true;
+    if (error) error->clear();
+    return ok;
 }
 
 } // namespace deepagent

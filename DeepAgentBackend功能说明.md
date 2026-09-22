@@ -312,3 +312,29 @@ msbuild E:\totem_AI\DeepAgent\DeepAgent.sln -p:Configuration=Debug -p:Platform=x
 **不建议作为基座**：④ liboai（归档）、⑤ olrea/openai-cpp（停更且无工具能力）、⑧ agents.cpp（许可证）、⑨ langgraph-cpp（C++23 + 过早）。
 
 **与现状的衔接**：当前自研框架（LLM 网关 + GUID 上下文 + 确定性 udrt 编译）已交付且经实测；若后续迁移，改造范围仅限 LLM 通信层（`llm_client.*` / `CNodeGateway` 内部实现），Agent 业务层与 REST 协议无需变动。
+
+## 13. V1.3.0 → V1.4.0 架构升级摘要（2026-09-21）
+
+> 详细变更见 `CHANGELOG.md`；本节只记录架构级差异，上文 §3.1 描述的固定管线自 V1.3.0 起为**回退路径**。
+
+### V1.3.0：Agent Loop 主路径（NeoGraph）
+
+- 聊天编排从固定五步管线升级为 **ReAct Agent Loop**：`neograph::llm::Agent`（NeoGraph `neograph_llm.lib`）+ DeepSeek 兼容 `OpenAIProvider`，LLM 自主决策调用 4 个工具（`list_knowledge_nodes` / `create_udrt` / `generate_node_asset` / `get_node_context`）的次数与顺序，`max_iterations=8` 止损；工具执行器在 `agent_graph.cpp`（`toolXxx` 系列公共方法）。
+- 工具协议异常时自动回退 §3.1 固定管线（`runLegacyPipeline`），行为不变。
+- 其余：文件输入（📎 .udrt/.xml 与聊天中路径）、多路流子步并发（`AssetGraphRunner`）、SSE `node_state` 事件、会话 JSON 落盘、open_folder 置顶。
+
+### V1.4.0：ZCode 可参考设计 P0-P4（来源：`docs/ZCode可参考设计_DeepAgent落地分析.md`）
+
+| 项 | 内容 | 位置 |
+|---|------|------|
+| P0 | 工具 error 回填修复线索：`repairable` / `hint` / `expected_one_of` / `known_guids` / `missing`，LLM 下一轮自主纠正 | `agent_graph.cpp` 三个工具执行器 |
+| P1 | Plan IR 脚本化：LLM 写 `define("plan", function(context){...})` JS 函数 → QuickJS 沙箱执行产出 Plan IR（if/for 条件逻辑、语法错误带行号）；沙箱限制：内存 64MB / 栈 1MB / 超时 5s（interrupt 中止）/ 无 libc 无文件网络；失败回填一轮自修复，仍失败回退内置模板 | `plan_script.{h,cpp}` + `planGraph()`（fallback 管线用） |
+| P2 | 编译诊断结构化：`compile/validate` 失败返回 `{error, path, expected, actual, hint, known_catalogs}`，随工具结果回填 LLM | `udrt_compiler.{h,cpp}` + `NodeCatalog::catalogKeys()` |
+| P3 | `create_udrt` 结果按 inputHash（SHA-256，BCrypt）进程内缓存，相同参数命中返回 `cached:true`，不重复调 LLM | `agent_graph.{h,cpp}` |
+| P4 | Plan IR 可选 `phases: [{name, nodes[]}]` 分组预留：随模板/工具结果/SSE `udrt` 事件透传，**不写入 udrt 文件**（U-DeepRT 格式兼容） | `templatePlan` / `toolCreateUdrt` / `runLegacyPipeline` |
+
+**QuickJS 集成方式**：复用 NeoGraph 的 MSVC 适配源码（`third_party\NeoGraph\build\generated\quickjs-msvc` 的 5 个 C 文件），以**无符号前缀**方式编入本工程——`backend/plan_js/quickjs-prefix.h` 空前缀 shim 在 include 顺序上先于 `deps/quickjs/neograph` 的真前缀头，与 `neograph_program.lib` 内 `neograph_qjs_*` 符号隔离共存（vcxproj 逐文件 `CompileAs=C / stdc11 / W0 / CONFIG_VERSION="2026-06-04"`）。exe 约 +2.3MB。
+
+**LLM 传输通道（V1.4.0 修复）**：NeoGraph `OpenAIProvider`（asio ConnPool 异步链路）在本服务进程内挂起不前，曾导致 Agent Loop 自 V1.3.0 起静默回退 legacy 管线（"准备中"空窗 20s+ 的根因）。现改为自研 `WinHttpProvider`（`winhttp_provider.{h,cpp}`，WinHTTP 传输 + 完整 OpenAI 工具协议含流式 tool_calls），`AgentGraph::run()` 与 `AssetGraphRunner` 统一注入；`LlmClient` 抽出 `postChatJson`/`postChatStream` 通用请求层。实测同一条字幕生成请求 125s+ → 5.3s。**今后新增走 neograph LLM Provider 的代码一律使用 WinHttpProvider**。
+
+**测试**：`build_asset_test.bat` → `asset_feature_test.exe`，F1-F12 + G1-G12 共 73 项断言全通过。G 组覆盖：合法脚本/if 条件/语法错误拦截/未注册 plan/非对象返回/死循环超时中止（312ms 触发）/超内存中止/中文数据往返/结构化诊断 path·expected·actual·known_catalogs/phases 格式兼容。

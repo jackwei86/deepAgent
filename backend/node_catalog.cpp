@@ -1,5 +1,6 @@
 #include "node_catalog.h"
 
+#include <algorithm>
 #include <fstream>
 
 using json = nlohmann::json;
@@ -26,6 +27,13 @@ const json* NodeCatalog::node(const std::string& catalogKey) const {
     auto it = nodes_.find(catalogKey);
     if (it == nodes_.end()) return nullptr;
     return &it.value();
+}
+
+std::vector<std::string> NodeCatalog::catalogKeys() const {
+    std::vector<std::string> keys;
+    for (auto it = nodes_.begin(); it != nodes_.end(); ++it) keys.push_back(it.key());
+    std::sort(keys.begin(), keys.end());
+    return keys;
 }
 
 bool NodeCatalog::resolvePort(const json& planNodes, const std::string& nodeKey,

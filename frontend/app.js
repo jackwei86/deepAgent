@@ -294,15 +294,21 @@
         var card = document.createElement('div');
         card.className = 'udrt-card asset-card';
         var fileName = (payload.file || '').split(/[\/]/).pop();
+        var previewSrc = '/api/asset/content?path=' + encodeURIComponent(payload.file || '') +
+                         '&t=' + Date.now();
         card.innerHTML =
             '<div class="uc-head"><span class="uc-title">🌐 已生成 HTML 资产文件</span></div>' +
             '<div class="uc-meta">关联节点 GUID：<code>' + escapeHtml(payload.guid || '') + '</code>' +
             ' · 版本：v' + (payload.version || 1) + '<br>' +
             '文件：' + escapeHtml(payload.absolute_path || payload.file || '') + '</div>' +
+            '<div class="asset-preview"><iframe sandbox="" src="' + previewSrc + '" ' +
+            'loading="lazy" title="资产预览"></iframe></div>' +
             '<div class="uc-actions">' +
             '<button class="view">🌐 在浏览器查看</button>' +
             '<button class="open-dir">📂 打开所在目录</button>' +
             '<button class="dl">⬇ 下载 .html</button>' +
+            '<button class="optimize">✨ 优化</button>' +
+            '<button class="toggle-preview">⤴ 收起预览</button>' +
             '</div>';
         card.querySelector('.view').onclick = function () {
             window.open('/api/asset/content?path=' + encodeURIComponent(payload.file || ''), '_blank');
@@ -326,6 +332,18 @@
                     a.click();
                     URL.revokeObjectURL(a.href);
                 });
+        };
+        card.querySelector('.optimize').onclick = function () {
+            if (sending) { alert('当前有消息处理中，请稍后再试'); return; }
+            inputEl.value = '请质检并优化这个 HTML 资产：' + (payload.file || '') +
+                (payload.guid ? '（guid: ' + payload.guid + '）' : '') +
+                '。请先读取内容评估质量，有问题直接优化并覆盖原文件，质量良好则简要说明评估结论。';
+            sendMessage();
+        };
+        card.querySelector('.toggle-preview').onclick = function () {
+            var box = card.querySelector('.asset-preview');
+            var hidden = box.classList.toggle('collapsed');
+            this.textContent = hidden ? '⤵ 展开预览' : '⤴ 收起预览';
         };
         bubble.insertBefore(card, bubble.querySelector('.content'));
         scrollBottom();

@@ -2,6 +2,36 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## V1.4.0 (2026-09-21)
+
+### 新增
+- **P1 — Plan IR 脚本化生成**：旧固定管线的 Plan 生成从"LLM 输出裸 JSON"升级为"LLM 写受限 JS 函数 + QuickJS 沙箱执行"（`define("plan", function(context){...})`），可用 if/for 表达条件逻辑；沙箱限制内存上限（64MB）、栈深（1MB）与执行超时（5s，interrupt 中止），不加载 libc、无文件/网络访问；执行失败自动回填错误给 LLM 一轮自修复，仍失败回退知识库内置模板（`plan_script.h/cpp`；QuickJS 采用 NeoGraph MSVC 适配源码无前缀编译，与 `neograph_*` 库内 prefixed quickjs 符号隔离共存）
+- **P2 — 编译诊断结构化**：`UdrtCompiler::compile/validate` 新增结构化诊断出参（`path`/`expected`/`actual`/`hint`/`known_catalogs`），`toolCreateUdrt` 将其回填给 Agent Loop 的 LLM 实现自修复；`NodeCatalog` 新增 `catalogKeys()` 合法值域清单
+- **P3 — create_udrt 结果缓存**：按 inputHash（SHA-256(entry_id+subtitle_text+style_prompt+model)）进程内缓存，相同参数直接返回上次结果并带 `cached: true` 标记，不重复调用 LLM
+- **P4 — phases 分组预留**：Plan IR 支持可选 `phases` 字段（`[{name, nodes[]}]`），随模板/工具结果/SSE `udrt` 事件透传；编译器不写入 udrt 文件（保持 U-DeepRT 格式兼容），供前端未来分组展示
+- **P0 — 工具错误修复线索补全**：`generate_node_asset`（参数缺失/节点 busy/管线失败）与 `get_node_context`（guid 不存在回填 `known_guids` 清单）的错误响应均携带 `repairable`/`hint`/`expected_one_of` 类字段，Agent Loop 的 LLM 可据此下一轮自主纠正
+- **资产卡片内嵌预览 + 一键质检优化**：HTML 资产卡片新增内嵌预览（sandbox iframe，默认展示、可收起）与「✨ 优化」按钮；点击后自动发起质检优化流程——Agent 先调新增的 `review_asset` 工具读回资产内容，按四维度（HTML 结构完整性/字幕文本保真/排版样式/用户样式要求符合度）评估，有问题则调 `generate_node_asset(kind=prompt, output_file=原路径)` 覆盖优化并推送 v2 资产卡片，质量良好则直接汇报评估结论。配套修复：资产路径解析基准修正（相对路径按协议以部署目录 exe_dir 为基准，修掉 `udrt\udrt\` 双拼）；未登记 node_context 的资产优化时以"优化指令 + 现有 HTML"自动播种上下文
+- ZCode 落地测试 G1-G12：沙箱脚本执行/条件逻辑/语法错误/超时中止/超内存中止/中文数据往返 + 结构化诊断 path/expected/actual + phases 格式兼容（F1-F12 回归全绿，共 73 项）
+
+### 变更
+- `DeepAgentBackend.vcxproj` 接入 QuickJS（5 个 C 源文件，逐文件 C11/无警告/空前缀 shim 编译），exe 约 +2.3MB
+- 测试构建脚本 `build_asset_test.bat` 扩展（QuickJS C11 目标 + P1/P2 测试源）
+
+### 修复
+- **Agent Loop 从未真正生效（V1.3.0 起即静默回退）**：工具检测请求（NeoGraph `OpenAIProvider`/ConnPool）在本服务进程内挂起至 120s 超时后静默回退旧固定管线——表现为"准备中"空窗 20s+、资产卡片 GUID 为空。多轮二分定位：同步 asio/WinHTTP/独立进程探针均正常，排除 DNS/线程上下文/防火墙/进程名拦截，确认为本进程内 ConnPool 异步链路缺陷（留待上游排查）。修复：新增 `WinHttpProvider`（`winhttp_provider.{h,cpp}`）以 WinHTTP 传输实现完整 OpenAI 工具协议（非流式 tool_calls 检测 + **流式 tool_calls 累积**，模型在流式轮直接发起工具调用不再被丢弃）；`AgentGraph::run()` 与 `AssetGraphRunner` 全部切换至该 Provider；`LlmClient` 抽出 `postChatJson`/`postChatStream` 通用请求层
+- **Agent Loop 产物卡片缺失**：`create_udrt` 工具执行器现在向前端发送 `udrt`/`asset` SSE 卡片事件（含 GUID/绝对路径/phases），Agent Loop 路径与 legacy 管线的卡片行为一致
+- **工具链中途"光说不做"**：编排提示词禁止工具调用过程中输出过渡性文字，要求 `list_knowledge_nodes → create_udrt` 连续完成
+- **"准备中"空窗无反馈**：新增工具调用观察点（`Agent::set_tool_gate`）+ 工具执行器状态事件（编译 udrt/生成 HTML 资产等长等待阶段均推 `status` SSE），前端全程可见进度；另加启动期网络自诊断日志（`[netdiag]`）与失败原因落盘（`[agent_loop]`）
+- 实测效果：同一条字幕生成请求从 125s+（含 120s 无反馈空窗）降至 **5.3s**，状态事件全程覆盖，udrt/HTML 产物与卡片、流式回复均正常
+
+## V1.3.0 (2026-09-21)
+
+### 新增
+- **Agent Loop 聊天编排**：接入 NeoGraph `neograph::llm::Agent`（ReAct 循环），LLM 自主决策调用 4 个工具（`list_knowledge_nodes` / `create_udrt` / `generate_node_asset` / `get_node_context`）的次数与顺序，`max_iterations=8` 止损；工具协议异常时回退旧固定管线（`runLegacyPipeline`）
+- **文件输入**：前端 📎 附件（.udrt/.xml）与聊天中路径输入，内容注入 LLM 上下文；上传文件落盘 `output/uploads/{chat_id}/`，删除会话联动清理
+- **多路流子步并发**：资产生成管线化（可选背景板分支 ∥ LLM 内容分支 → 合成），`AssetGraphRunner` 并发执行 + 子步状态 SSE 事件
+- 会话 JSON 落盘、会话归档、`open_folder` 窗口置顶、HTML 资产卡片打开所在目录
+
 ## V1.2.0 (2026-09-20)
 
 ### 新增

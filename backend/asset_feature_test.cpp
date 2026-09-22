@@ -1,5 +1,6 @@
 // Node 资产生成子步并发 —— 逐项功能测试 F1-F12（独立 exe，FakeProvider）。
 // 设计文档：docs/Node资产生成子步并发设计.md §4 测试矩阵。
+// ZCode 可参考设计落地测试 G1-G12（P1 沙箱 / P2 结构化诊断 / P4 phases）。
 // 构建：build_asset_test.bat（cl 直编，不进 DeepAgentBackend.vcxproj）。
 
 #include <atomic>
@@ -14,6 +15,9 @@
 #include "asset_adapters.h"
 #include "asset_pipeline.h"
 #include "asset_runner.h"
+#include "node_catalog.h"
+#include "plan_script.h"
+#include "udrt_compiler.h"
 
 #include <asio/steady_timer.hpp>
 #include <asio/this_coro.hpp>
@@ -396,6 +400,163 @@ void testF12() {
     CHECK(ms < 200, ("F12: 墙钟 " + std::to_string(ms) + "ms < 200ms（串行应≥320ms）").c_str());
 }
 
+// ================= ZCode 可参考设计落地测试（P1/P2/P4）G1-G12 =================
+
+void testG1toG8() {
+    std::printf("\n-- P1: Plan IR 脚本化 + QuickJS 沙箱 --\n");
+    json context{{"user_requirement", "生成一份字幕 HTML"},
+                 {"style_prompt", ""},
+                 {"catalogs", json::array({json{{"catalog", "cat_a"}}})}};
+
+    // G1: 合法脚本 → Plan IR
+    const char* okScript =
+        "define(\"plan\", function(context) {"
+        "  var nodes = []; var links = [];"
+        "  nodes.push({key: \"tool\", catalog: \"cat_a\"});"
+        "  nodes.push({key: \"sink\", catalog: \"cat_b\"});"
+        "  links.push({from: \"tool:html_file\", to: \"sink:in0\"});"
+        "  return {nodes: nodes, links: links};"
+        "});";
+    auto r = executePlanScript(okScript, context);
+    CHECK(r.ok, "G1: 合法脚本执行成功");
+    CHECK(r.ok && r.planIr.value("nodes", json::array()).size() == 2,
+          "G1: Plan IR 含 2 个 nodes");
+    CHECK(r.ok && r.planIr.value("links", json::array()).size() == 1,
+          "G1: Plan IR 含 1 条 link");
+    CHECK(r.ok && r.planIr["links"][0].value("from", "") == "tool:html_file",
+          "G1: link 字段保真（含中文名端口也走 JSON 往返）");
+
+    // G2: if 条件逻辑（裸 JSON 做不到）
+    const char* condScript =
+        "define(\"plan\", function(context) {"
+        "  var nodes = [{key: \"tool\", catalog: \"cat_a\"}];"
+        "  if (context.style_prompt) nodes.push({key: \"style\", catalog: \"cat_a\"});"
+        "  return {nodes: nodes, links: []};"
+        "});";
+    auto rOff = executePlanScript(condScript, context);
+    CHECK(rOff.ok && rOff.planIr["nodes"].size() == 1, "G2: style_prompt 为空 → 1 节点");
+    json ctxStyled = context;
+    ctxStyled["style_prompt"] = "字体大一点";
+    auto rOn = executePlanScript(condScript, ctxStyled);
+    CHECK(rOn.ok && rOn.planIr["nodes"].size() == 2, "G2: style_prompt 非空 → 2 节点（if 生效）");
+
+    // G3: 语法错误 → 可读报错（含行号语义）
+    auto rSyn = executePlanScript("define(\"plan\", function(context) { return {nodes: [; });", context);
+    CHECK(!rSyn.ok && rSyn.error.find("syntax") != std::string::npos,
+          ("G3: 语法错误被拦截: " + rSyn.error.substr(0, 60)).c_str());
+
+    // G4: 缺 define("plan") → 报错提示脚本约定
+    auto rNoDef = executePlanScript("var x = 1; x += 2;", context);
+    CHECK(!rNoDef.ok && rNoDef.error.find("define") != std::string::npos,
+          "G4: 未注册 plan 函数给出约定提示");
+
+    // G5: plan() 返回非对象 → 拒绝
+    auto rNum = executePlanScript("define(\"plan\", function(c){ return 42; });", context);
+    CHECK(!rNum.ok && rNum.error.find("object") != std::string::npos,
+          "G5: 非对象返回值被拒绝");
+
+    // G6: 死循环 → interrupt 中止，timeout 标记
+    const auto t0 = std::chrono::steady_clock::now();
+    auto rLoop = executePlanScript(
+        "define(\"plan\", function(c){ while(true){} return null; });",
+        context, /*memoryLimitBytes=*/16 * 1024 * 1024, /*timeoutMs=*/300);
+    const auto loopMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - t0).count();
+    CHECK(!rLoop.ok && rLoop.timeout, "G6: 死循环被超时中止");
+    CHECK(loopMs < 3000, ("G6: 中止墙钟 " + std::to_string(loopMs) + "ms < 3000ms").c_str());
+
+    // G7: 内存上限 → 分配失败中止
+    auto rMem = executePlanScript(
+        "define(\"plan\", function(c){ var a = []; for(;;) a.push(new Array(1000000)); });",
+        context, /*memoryLimitBytes=*/16 * 1024 * 1024, /*timeoutMs=*/5000);
+    CHECK(!rMem.ok, ("G7: 超内存被中止: " + rMem.error.substr(0, 60)).c_str());
+
+    // G8: context 数据注入（中文往返）
+    const char* echoScript =
+        "define(\"plan\", function(context) {"
+        "  return {nodes: [{key: context.user_requirement, catalog: \"cat_a\"}], links: []};"
+        "});";
+    auto rEcho = executePlanScript(echoScript, context);
+    CHECK(rEcho.ok && rEcho.planIr["nodes"][0].value("key", "") == "生成一份字幕 HTML",
+          "G8: context 中文数据往返保真");
+}
+
+void testG9toG12(const std::string& out_dir) {
+    std::printf("\n-- P2 结构化诊断 + P4 phases 预留 --\n");
+    // 测试目录：两个 catalog（含 model_name 与语义端口）
+    json catalogJson;
+    catalogJson["nodes"]["test_cat_a"] = {
+        {"model_name", "0x12345678"},
+        {"output_ports", json{{"html_file", 0}}},
+        {"input_ports", json::object()},
+        {"props", json::object()}};
+    catalogJson["nodes"]["test_cat_b"] = {
+        {"model_name", "0x87654321"},
+        {"output_ports", json::object()},
+        {"input_ports", json{{"in0", 0}}},
+        {"props", json::object()}};
+    const std::string catPath = out_dir + "\\zcode_test_catalog.json";
+    {
+        std::ofstream f(catPath, std::ios::binary | std::ios::trunc);
+        f << catalogJson.dump();
+    }
+    NodeCatalog catalog;
+    std::string err;
+    CHECK(catalog.load(catPath, &err), "G9 前置: 测试目录加载");
+
+    UdrtCompiler compiler(catalog);
+    json planGood{
+        {"nodes", json::array({
+            json{{"key", "tool"}, {"catalog", "test_cat_a"}},
+            json{{"key", "sink"}, {"catalog", "test_cat_b"}}})},
+        {"links", json::array({json{{"from", "tool:html_file"}, {"to", "sink:in0"}}})}};
+
+    // G9: 未知 catalog → path/expected/actual/known_catalogs/hint 全套
+    json planBadCat = planGood;
+    planBadCat["nodes"][0]["catalog"] = "no_such_cat";
+    json udrt, d1;
+    std::string e1;
+    CHECK(!compiler.compile(planBadCat, &udrt, &e1, &d1), "G9: 未知 catalog 编译失败");
+    CHECK(d1.value("path", "") == "/nodes[0]/catalog", "G9: path 定位到节点目录字段");
+    CHECK(d1.contains("expected") && d1.contains("actual") && d1.contains("hint"),
+          "G9: expected/actual/hint 齐备");
+    CHECK(d1.value("known_catalogs", json::array()).size() == 2, "G9: known_catalogs 合法值域");
+    CHECK(d1.value("actual", "") == "no_such_cat", "G9: actual 为非法值");
+
+    // G9b: 坏端口引用 → path 指向 link
+    json planBadLink = planGood;
+    planBadLink["links"][0]["from"] = "tool:无此端口";
+    json d2;
+    CHECK(!compiler.compile(planBadLink, &udrt, &e1, &d2), "G9b: 非法端口编译失败");
+    CHECK(d2.value("path", "") == "/links[0]/from", "G9b: path 定位到 link 端口");
+
+    // G10: validate 篡改 model_name → path/actual 精准
+    CHECK(compiler.compile(planGood, &udrt, &e1, &d2), "G10 前置: 合法 Plan 编译成功");
+    json tampered = udrt;
+    tampered["nodes"][0]["internal-data"]["model_name"] = "zzz";
+    json d3;
+    CHECK(!compiler.validate(tampered, &e1, &d3), "G10: 篡改 model_name 校验失败");
+    CHECK(d3.value("path", "").find("model_name") != std::string::npos,
+          "G10: path 指向 internal-data/model_name");
+    CHECK(d3.value("actual", "") == "zzz", "G10: actual 为篡改值");
+    CHECK(d3.value("expected", "").find("0x") != std::string::npos,
+          "G10: expected 描述合法格式");
+
+    // G11: catalogKeys 排序返回
+    const auto keys = catalog.catalogKeys();
+    CHECK(keys.size() == 2 && keys[0] == "test_cat_a" && keys[1] == "test_cat_b",
+          "G11: catalogKeys 全量且有序");
+
+    // G12: phases 预留——Plan 可带 phases，编译成功且不写入 udrt（格式兼容）
+    json planPhases = planGood;
+    planPhases["phases"] = json::array({
+        json{{"name", "生成"}, {"nodes", json::array({"tool"})}},
+        json{{"name", "输出"}, {"nodes", json::array({"sink"})}}});
+    json udrt3;
+    CHECK(compiler.compile(planPhases, &udrt3, &e1, &d3), "G12: 含 phases 的 Plan 编译成功");
+    CHECK(!udrt3.contains("phases"), "G12: udrt 文件不含 phases（U-DeepRT 格式兼容）");
+}
+
 int main() {
     std::printf("===== Node 资产生成子步并发 逐项功能测试 =====\n\n");
     AdapterRegistry::instance().registerAdapter("test_slow_bg", slowBgAdapter);
@@ -413,6 +574,8 @@ int main() {
     testF10();
     testF11();
     testF12();
+    testG1toG8();
+    testG9toG12(out_dir);
 
     std::printf("\n===== 结果：%d 通过 / %d 失败 =====\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

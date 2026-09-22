@@ -41,7 +41,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\third_party\NeoGraph\include;$(ProjectDir)..\third_party\NeoGraph\deps\asio\include;$(ProjectDir)..\third_party\NeoGraph\deps\yyjson;$(ProjectDir)..\third_party\NeoGraph\deps;D:\ProgramData\Anaconda3\Library\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\third_party\NeoGraph\include;$(ProjectDir)..\third_party\NeoGraph\deps\asio\include;$(ProjectDir)..\third_party\NeoGraph\deps\yyjson;$(ProjectDir)..\third_party\NeoGraph\deps;$(ProjectDir)..\third_party\NeoGraph\build\generated\quickjs-msvc;D:\ProgramData\Anaconda3\Library\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
@@ -59,6 +59,8 @@
     <ClCompile Include="node_catalog.cpp" />
     <ClCompile Include="udrt_compiler.cpp" />
     <ClCompile Include="agent_graph.cpp" />
+    <ClCompile Include="plan_script.cpp" />
+    <ClCompile Include="winhttp_provider.cpp" />
     <ClCompile Include="asset_pipeline.cpp" />
     <ClCompile Include="asset_adapters.cpp" />
     <ClCompile Include="asset_runner.cpp" />
@@ -67,6 +69,49 @@
     <ClCompile Include="node_context.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="tray.cpp" />
+    <!-- P1: QuickJS（MSVC 适配源码，无符号前缀；plan_js 空前缀 shim 在 include 顺序上
+         先于 deps/quickjs/neograph，覆盖真实前缀头，与 neograph_* 库中的 prefixed
+         quickjs 符号隔离共存） -->
+    <ClCompile Include="$(ProjectDir)..\third_party\NeoGraph\build\generated\quickjs-msvc\quickjs.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir)plan_js;$(ProjectDir)..\third_party\NeoGraph\build\generated\quickjs-msvc;$(ProjectDir)..\third_party\NeoGraph\deps\quickjs</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>CONFIG_VERSION=&quot;2026-06-04&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="$(ProjectDir)..\third_party\NeoGraph\build\generated\quickjs-msvc\cutils.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir)plan_js;$(ProjectDir)..\third_party\NeoGraph\build\generated\quickjs-msvc;$(ProjectDir)..\third_party\NeoGraph\deps\quickjs</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>CONFIG_VERSION=&quot;2026-06-04&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="$(ProjectDir)..\third_party\NeoGraph\build\generated\quickjs-msvc\dtoa.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir)plan_js;$(ProjectDir)..\third_party\NeoGraph\build\generated\quickjs-msvc;$(ProjectDir)..\third_party\NeoGraph\deps\quickjs</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>CONFIG_VERSION=&quot;2026-06-04&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="$(ProjectDir)..\third_party\NeoGraph\build\generated\quickjs-msvc\libregexp.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir)plan_js;$(ProjectDir)..\third_party\NeoGraph\build\generated\quickjs-msvc;$(ProjectDir)..\third_party\NeoGraph\deps\quickjs</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>CONFIG_VERSION=&quot;2026-06-04&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="$(ProjectDir)..\third_party\NeoGraph\build\generated\quickjs-msvc\libunicode.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir)plan_js;$(ProjectDir)..\third_party\NeoGraph\build\generated\quickjs-msvc;$(ProjectDir)..\third_party\NeoGraph\deps\quickjs</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>CONFIG_VERSION=&quot;2026-06-04&quot;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="config.h" />
@@ -75,6 +120,8 @@
     <ClInclude Include="node_catalog.h" />
     <ClInclude Include="udrt_compiler.h" />
     <ClInclude Include="agent_graph.h" />
+    <ClInclude Include="plan_script.h" />
+    <ClInclude Include="winhttp_provider.h" />
     <ClInclude Include="asset_pipeline.h" />
     <ClInclude Include="asset_adapters.h" />
     <ClInclude Include="asset_runner.h" />

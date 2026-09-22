@@ -1,11 +1,15 @@
 #include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <system_error>
 #include <thread>
 
 #include <windows.h>
 #include <shellapi.h>
+
+#include <asio.hpp>
 
 #include "agent_graph.h"
 #include "chat_store.h"
@@ -19,6 +23,8 @@
 #include "udrt_compiler.h"
 
 namespace fs = std::filesystem;
+
+namespace asio_ns = asio;
 
 namespace {
 
@@ -98,6 +104,62 @@ void openChatInBrowser(const deepagent::Config& config) {
                   nullptr, SW_SHOWNORMAL);
 }
 
+// 启动期网络自诊断：与 NeoGraph ConnPool 相同的 asio 解析+直连路径，
+// 用于区分"进程级出站阻断"与"请求期上下文问题"（一次 10s 上限，不阻塞启动）
+void netDiag(const deepagent::Config& config) {
+    namespace asio = asio_ns;
+    const std::string host = [&] {
+        std::string h = config.llm_base_url;
+        const auto scheme = h.find("://");
+        if (scheme != std::string::npos) h = h.substr(scheme + 3);
+        const auto path = h.find('/');
+        if (path != std::string::npos) h = h.substr(0, path);
+        return h;
+    }();
+
+    asio::io_context io;
+    const auto t0 = std::chrono::steady_clock::now();
+    asio::ip::tcp::resolver resolver(io);
+    std::error_code ec;
+    auto endpoints = resolver.resolve(host, "443", ec);
+    const auto resolveMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::steady_clock::now() - t0)
+                               .count();
+    if (ec || endpoints.empty()) {
+        deepagent::Logf("[netdiag] resolve %s failed in %lldms: %s", host.c_str(),
+                        static_cast<long long>(resolveMs), ec.message().c_str());
+        return;
+    }
+    deepagent::Logf("[netdiag] resolve %s OK in %lldms (%zu addrs)", host.c_str(),
+                    static_cast<long long>(resolveMs), endpoints.size());
+
+    asio::ip::tcp::socket sock(io);
+    const auto t1 = std::chrono::steady_clock::now();
+    bool done = false;
+    std::string connectErr;
+    asio::async_connect(
+        sock, endpoints,
+        [&](const std::error_code& e, const asio::ip::tcp::endpoint&) {
+            done = true;
+            if (e) connectErr = e.message();
+        });
+    while (!done && std::chrono::steady_clock::now() - t1 < std::chrono::seconds(10))
+        io.run_for(std::chrono::milliseconds(50));
+    const auto connectMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::steady_clock::now() - t1)
+                               .count();
+    std::error_code ignore;
+    sock.close(ignore);
+    if (done && connectErr.empty())
+        deepagent::Logf("[netdiag] connect %s:443 OK in %lldms", host.c_str(),
+                        static_cast<long long>(connectMs));
+    else
+        deepagent::Logf("[netdiag] connect %s:443 %s after %lldms (%s)", host.c_str(),
+                        done ? "FAILED" : "TIMEOUT(10s)",
+                        static_cast<long long>(connectMs),
+                        done ? connectErr.c_str() : "no completion");
+}
+
 } // namespace
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
@@ -122,6 +184,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int) {
     deepagent::Logf("LLM           : %s%s (model=%s, key=%s)", config.llm_base_url.c_str(),
                     config.llm_path.c_str(), config.llm_model.c_str(),
                     config.llmConfigured() ? "configured" : "MISSING");
+
+    // 启动期网络自诊断（≤10s）：asio 直连 LLM 端点，定位 Agent Loop 卡点
+    netDiag(config);
 
     // 3. 知识库 / 节点目录
     deepagent::KnowledgeBase knowledge;

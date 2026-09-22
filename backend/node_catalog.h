@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "third_party/json.hpp"
 
@@ -20,6 +21,9 @@ public:
     bool resolvePort(const nlohmann::json& planNodes, const std::string& nodeKey,
                      const std::string& semanticPort, int* portIndex,
                      const nlohmann::json** catalogNode) const;
+
+    // All catalog keys (sorted) — used by structured diagnostics (P2).
+    std::vector<std::string> catalogKeys() const;
 
 private:
     nlohmann::json nodes_ = nlohmann::json::object();
