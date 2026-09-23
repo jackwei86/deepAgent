@@ -301,8 +301,7 @@
             '<div class="uc-meta">关联节点 GUID：<code>' + escapeHtml(payload.guid || '') + '</code>' +
             ' · 版本：v' + (payload.version || 1) + '<br>' +
             '文件：' + escapeHtml(payload.absolute_path || payload.file || '') + '</div>' +
-            '<div class="asset-preview"><iframe sandbox="" src="' + previewSrc + '" ' +
-            'loading="lazy" title="资产预览"></iframe></div>' +
+            '<div class="asset-preview"></div>' +
             '<div class="uc-actions">' +
             '<button class="view">🌐 在浏览器查看</button>' +
             '<button class="open-dir">📂 打开所在目录</button>' +
@@ -310,6 +309,36 @@
             '<button class="optimize">✨ 优化</button>' +
             '<button class="toggle-preview">⤴ 收起预览</button>' +
             '</div>';
+        // 内嵌预览：sandbox 只放开同源（父页面可测量内容高度，禁执行资产内脚本）。
+        // 字幕 HTML 多为 height:100% + flex 垂直居中，固定高度会上下裁切，
+        // 因此加载后按 body 实际布局底边自适应高度。
+        var previewBox = card.querySelector('.asset-preview');
+        var frame = document.createElement('iframe');
+        frame.sandbox = 'allow-same-origin';
+        frame.src = previewSrc;
+        frame.loading = 'lazy';
+        frame.title = '资产预览';
+        frame.addEventListener('load', function () {
+            var fit = function () {
+                try {
+                    var doc = frame.contentDocument;
+                    if (!doc || !doc.body) return;
+                    var bottom = 0;
+                    var els = doc.querySelectorAll('body, body *');
+                    for (var i = 0; i < els.length; ++i) {
+                        var r = els[i].getBoundingClientRect();
+                        if (r.bottom > bottom) bottom = r.bottom;
+                    }
+                    if (bottom > 0) {
+                        var h = Math.ceil(Math.min(Math.max(bottom + 16, 120), 640));
+                        frame.style.height = h + 'px';
+                    }
+                } catch (e) { /* 测量不可用时保持默认高度 */ }
+            };
+            fit();
+            setTimeout(fit, 250);   // 字体/图片等延迟资源加载后再校一次
+        });
+        previewBox.appendChild(frame);
         card.querySelector('.view').onclick = function () {
             window.open('/api/asset/content?path=' + encodeURIComponent(payload.file || ''), '_blank');
         };
@@ -400,7 +429,7 @@
 
     var fileInputEl = document.createElement('input');
     fileInputEl.type = 'file';
-    fileInputEl.accept = '.udrt,.xml,.json,.txt,.md';
+    fileInputEl.accept = '.udrt,.xml,.avatar,.json,.txt,.md';
     fileInputEl.multiple = true;
     fileInputEl.style.display = 'none';
     document.body.appendChild(fileInputEl);

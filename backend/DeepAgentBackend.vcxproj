@@ -61,6 +61,10 @@
     <ClCompile Include="agent_graph.cpp" />
     <ClCompile Include="plan_script.cpp" />
     <ClCompile Include="winhttp_provider.cpp" />
+    <ClCompile Include="avatar_parser.cpp" />
+    <ClCompile Include="process_launcher.cpp" />
+    <ClCompile Include="event_hub.cpp" />
+    <ClCompile Include="asset_context.cpp" />
     <ClCompile Include="asset_pipeline.cpp" />
     <ClCompile Include="asset_adapters.cpp" />
     <ClCompile Include="asset_runner.cpp" />
@@ -121,6 +125,10 @@
     <ClInclude Include="udrt_compiler.h" />
     <ClInclude Include="agent_graph.h" />
     <ClInclude Include="plan_script.h" />
+    <ClInclude Include="avatar_parser.h" />
+    <ClInclude Include="process_launcher.h" />
+    <ClInclude Include="event_hub.h" />
+    <ClInclude Include="asset_context.h" />
     <ClInclude Include="winhttp_provider.h" />
     <ClInclude Include="asset_pipeline.h" />
     <ClInclude Include="asset_adapters.h" />

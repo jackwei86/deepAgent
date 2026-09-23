@@ -44,6 +44,13 @@ neograph::json AssetGraphRunner::buildInput(const std::vector<AssetRequest>& req
             if (!config_.system_prompt.empty())
                 messages.push_back({{"role", "system"}, {"content", config_.system_prompt}});
             std::string text = req.user_text.is_string() ? req.user_text.get<std::string>() : "";
+            // V1.5.1: 样式要求拼入用户消息（AssetContext.style_prompt 经此进入生成，
+            // notify 重生成才能保持原始样式；与 legacy 管线"样式要求："惯例一致）
+            std::string style;
+            if (req.context.is_object() && req.context.contains("style") &&
+                req.context["style"].is_string())
+                style = req.context["style"].get<std::string>();
+            if (!style.empty() && !text.empty()) text += "\n\n样式要求：" + style;
             if (!text.empty()) messages.push_back({{"role", "user"}, {"content", text}});
         }
         input[assetPromptChannel(s)] = std::move(messages);

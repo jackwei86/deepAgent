@@ -10,9 +10,12 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include "asset_context.h"
 #include "asset_pipeline.h"
 #include "asset_runner.h"
+#include "event_hub.h"
 #include "log.h"
+#include "process_launcher.h"
 #include "third_party/httplib.h"
 #include "third_party/json.hpp"
 
@@ -21,6 +24,21 @@ using namespace httplib;
 
 namespace deepagent {
 namespace {
+
+// 只读文件会使 remove_all 失败：先递归清属性再删（工程副本可能继承源文件只读位）
+void forceRemoveAll(const std::string& dir) {
+    std::error_code ec;
+    const std::filesystem::path root(dir);
+    if (!std::filesystem::exists(root, ec)) return;
+    for (auto it = std::filesystem::recursive_directory_iterator(
+             root, std::filesystem::directory_options::skip_permission_denied, ec);
+         it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
+        std::error_code pec;
+        if (it->is_regular_file(pec))
+            std::filesystem::permissions(it->path(), std::filesystem::perms::all, pec);
+    }
+    std::filesystem::remove_all(root, ec);
+}
 
 void writeFrame(DataSink& sink, const std::string& event, const json& payload) {
     std::string frame = "event: " + event + "\ndata: " + payload.dump() + "\n\n";
@@ -126,10 +144,16 @@ void HttpServer::registerHandlers() {
             res.set_content(R"({"error":"chat not found"})", "application/json; charset=utf-8");
             return;
         }
-        // 联动清理：删除该会话关联的上传文件目录
-        std::string upDir = config_.exe_dir + "\\uploads\\" + delChatId;
-        std::error_code ec;
-        std::filesystem::remove_all(upDir, ec);
+        // 联动清理（V1.5.1）：删除上传文件、工程副本、该会话生成的资产产物与上下文
+        // （工程副本可能继承源文件只读位，须先清属性再删）
+        AssetContextStore ctxStore(config_.udrt_output_dir);
+        for (const auto& artifact : ctxStore.removeByChat(delChatId, nullptr)) {
+            if (artifact.empty()) continue;
+            std::error_code ec2;
+            std::filesystem::remove(artifact, ec2);
+        }
+        forceRemoveAll(config_.exe_dir + "\\uploads\\" + delChatId);
+        forceRemoveAll(config_.exe_dir + "\\projects\\" + delChatId);
         res.set_content(R"({"deleted":true})", "application/json; charset=utf-8");
     });
 
@@ -160,6 +184,176 @@ void HttpServer::registerHandlers() {
 
     server_->Post("/api/chat/stream",
                   [this](const Request& req, Response& res) { handleChatStream(req, res); });
+
+    // ===== 工程宿主进程启动（V1.5.0 R2）：CreateProcessW + 句柄表 =====
+
+    // 手动启动：body {kind:"avatar"|"udrt", project:<绝对或相对路径>}
+    server_->Post("/api/launch", [this](const Request& req, Response& res) {
+        json body;
+        try {
+            body = json::parse(req.body);
+        } catch (const std::exception&) {
+            res.status = 400;
+            res.set_content(R"({"error":"invalid JSON body"})", "application/json; charset=utf-8");
+            return;
+        }
+        std::string kind = safeString(body, "kind");
+        std::string project = safeString(body, "project");
+        if (kind != "avatar" && kind != "udrt") {
+            res.status = 400;
+            res.set_content(R"({"error":"kind must be avatar or udrt"})",
+                            "application/json; charset=utf-8");
+            return;
+        }
+        if (project.empty()) {
+            res.status = 400;
+            res.set_content(R"({"error":"project is required"})",
+                            "application/json; charset=utf-8");
+            return;
+        }
+        // 相对路径按 exe_dir 解析；要求文件存在
+        std::string p = project;
+        for (auto& ch : p) if (ch == '/') ch = '\\';
+        std::string abs = p;
+        if (p.size() < 2 || p[1] != ':') abs = config_.exe_dir + "\\" + p;
+        DWORD attr = GetFileAttributesW([&] {
+            int wl = MultiByteToWideChar(CP_UTF8, 0, abs.c_str(), (int)abs.size(), nullptr, 0);
+            std::wstring w(wl, L'\0');
+            MultiByteToWideChar(CP_UTF8, 0, abs.c_str(), (int)abs.size(), &w[0], wl);
+            return w;
+        }().c_str());
+        if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY)) {
+            res.status = 404;
+            json err{{"error", "project file not found: " + abs}};
+            res.set_content(err.dump(), "application/json; charset=utf-8");
+            return;
+        }
+        const std::string& exe = (kind == "avatar") ? config_.avatar_exe : config_.udrt_exe;
+        DWORD pid = 0;
+        std::string err;
+        json out;
+        if (ProcessLauncher::instance().launch(kind, exe, abs, &pid, &err)) {
+            out["launched"] = true;
+            out["pid"] = pid;
+            out["exe"] = exe;
+            out["project"] = abs;
+        } else {
+            out["launched"] = false;
+            out["error"] = err;
+        }
+        res.set_content(out.dump(), "application/json; charset=utf-8");
+    });
+
+    // 启动记录快照
+    server_->Get("/api/processes", [this](const Request&, Response& res) {
+        json arr = json::array();
+        for (const auto& info : ProcessLauncher::instance().snapshot()) {
+            arr.push_back({{"kind", info.kind},
+                           {"project", info.project},
+                           {"exe", info.exe},
+                           {"pid", info.pid},
+                           {"running", info.running},
+                           {"exit_code", info.exitCode},
+                           {"error", info.error}});
+        }
+        json out{{"processes", arr}};
+        res.set_content(out.dump(), "application/json; charset=utf-8");
+    });
+
+    // ===== 双向 IPC（V1.5.0 R3）：exe SSE 订阅 + 参数变更通知 =====
+
+    // exe 订阅资产更新事件（SSE 长连接；project 过滤为空则收全部）
+    server_->Get("/api/exe/events", [this](const Request& req, Response& res) {
+        std::string project = req.get_param_value("project");
+        auto sub = EventHub::instance().subscribe(project);
+        res.set_header("Cache-Control", "no-cache");
+        res.set_header("X-Accel-Buffering", "no");
+        res.set_chunked_content_provider(
+            "text/event-stream", [sub](size_t /*offset*/, DataSink& sink) -> bool {
+                while (true) {
+                    std::string event, data;
+                    EventHub::PopResult r = sub->waitPop(&event, &data, 15000);
+                    if (r == EventHub::PopResult::Closed) break;
+                    if (r == EventHub::PopResult::Got) {
+                        std::string frame =
+                            "event: " + event + "\ndata: " + data + "\n\n";
+                        if (!sink.write(frame.c_str(), frame.size())) break;
+                    } else {
+                        // 15s 无事件发 keepalive 注释帧，探测断连并防中间层超时
+                        if (!sink.write(": keepalive\n\n", 13)) break;
+                    }
+                }
+                sink.done();
+                return true;
+            });
+    });
+
+    // exe 参数变更通知 → 单节点重生成 → hub 推 asset_updated
+    server_->Post("/api/exe/notify", [this](const Request& req, Response& res) {
+        json body;
+        try {
+            body = json::parse(req.body);
+        } catch (const std::exception&) {
+            res.status = 400;
+            res.set_content(R"({"error":"invalid JSON body"})", "application/json; charset=utf-8");
+            return;
+        }
+        const std::string project = safeString(body, "project");
+        const std::string source = safeString(body, "source");
+        // V1.5.1: changes 带 guid 时 project 可空（索引直查）
+        bool changesHaveGuid = false;
+        if (body.contains("changes") && body["changes"].is_array())
+            for (const auto& ch : body["changes"])
+                if (ch.is_object() && !ch.value("guid", "").empty()) changesHaveGuid = true;
+        if (project.empty() && !changesHaveGuid) {
+            res.status = 400;
+            res.set_content(R"({"error":"project is required"})",
+                            "application/json; charset=utf-8");
+            return;
+        }
+        if (!body.contains("changes") || !body["changes"].is_array() || body["changes"].empty()) {
+            res.status = 400;
+            res.set_content(R"({"error":"changes array is required"})",
+                            "application/json; charset=utf-8");
+            return;
+        }
+        json results = json::array();
+        int accepted = 0;
+        for (const auto& ch : body["changes"]) {
+            std::string nodePtr = ch.value("node_ptr", "");
+            const std::string nodeId = ch.value("node_id", "");
+            const std::string chGuid = ch.value("guid", "");
+            if (nodePtr.empty() && !chGuid.empty()) nodePtr = chGuid;  // guid 直查
+            const std::string param = ch.value("param", "text_in");
+            const std::string value = ch.value("value", "");
+            if (param != "text_in") {
+                results.push_back(json{{"node_ptr", nodePtr},
+                                       {"param", param},
+                                       {"ok", false},
+                                       {"error", "unsupported param (V1.5.0 only text_in)"}});
+                continue;
+            }
+            if (value.empty()) {
+                results.push_back(json{{"node_ptr", nodePtr},
+                                       {"param", param},
+                                       {"ok", false},
+                                       {"error", "empty value"}});
+                continue;
+            }
+            std::string raw =
+                agent_.regenerateAvatarNode(project, nodePtr, nodeId, value);
+            json r = json::parse(raw, nullptr, false);
+            const bool ok = r.is_object() && r.value("ok", false);
+            if (ok) ++accepted;
+            results.push_back(json{{"node_ptr", nodePtr},
+                                   {"node_id", nodeId},
+                                   {"param", param},
+                                   {"ok", ok},
+                                   {"result", r.is_object() ? r : json{{"raw", raw}}}});
+        }
+        json out{{"source", source}, {"accepted", accepted}, {"results", results}};
+        res.set_content(out.dump(), "application/json; charset=utf-8");
+    });
 
     // ===== Node 网关：LLM 请求统一经 DeepAgentBackend 代理 =====
 
@@ -407,14 +601,12 @@ void HttpServer::handleChatStream(const Request& req, Response& res) {
         if (existing.is_null()) chatId = chats_.createChat();
     }
 
-    // 附件：[{filename, content}]，保存到 uploads\{chat_id}\ 并注入用户消息
+    // 附件：[{filename, content}]——工程文件(.udrt/.avatar)存 projects\{chat_id}，
+    // 普通附件存 uploads\{chat_id}；内容/路径按"按需发送"原则注入用户消息
     std::string attachmentContext;
     {
         json attachArr = body.value("attachments", json::array());
         if (attachArr.is_array() && !attachArr.empty()) {
-            std::string uploadsDir = config_.exe_dir + "\\uploads\\" + chatId;
-            std::error_code ec;
-            std::filesystem::create_directories(uploadsDir, ec);
             for (const auto& a : attachArr) {
                 std::string fname = a.value("filename", "");
                 std::string content = a.value("content", "");
@@ -422,15 +614,31 @@ void HttpServer::handleChatStream(const Request& req, Response& res) {
                 // 安全：剥路径只取文件名
                 size_t slash = fname.find_last_of("\\/");
                 if (slash != std::string::npos) fname = fname.substr(slash + 1);
-                std::string fpath = uploadsDir + "\\" + fname;
+                // V1.5.1: 工程文件（.udrt/.avatar）全量复制到 projects\{chat_id}——
+                // 副本即唯一工作文件（源文件与项目解耦）；普通附件仍存 uploads
+                bool isProject =
+                    fname.size() > 6 && fname.substr(fname.size() - 6) == ".udrt";
+                if (fname.size() > 7 && fname.substr(fname.size() - 7) == ".avatar")
+                    isProject = true;
+                const std::string dir = config_.exe_dir + "\\" +
+                                        (isProject ? "projects\\" : "uploads\\") + chatId;
+                std::error_code ec2;
+                std::filesystem::create_directories(dir, ec2);
+                std::string fpath = dir + "\\" + fname;
                 std::ofstream ofs(fpath, std::ios::binary | std::ios::trunc);
                 if (ofs) { ofs << content; }
+                // 告知 LLM 保存路径（工程文件的工具调用按需使用；.avatar 内容不注入）
+                bool isAvatar = fname.size() > 7 && fname.substr(fname.size() - 7) == ".avatar";
+                if (!isAvatar)
+                    attachmentContext += "\n\n--- 附件: " + fname + " ---\n" +
+                                         content.substr(0, 12000);
+                attachmentContext += "\n\n[附件 " + fname + " 已保存至: " + fpath + "]";
                 Logf("[upload] saved %s (%zu bytes) to %s", fname.c_str(), content.size(), fpath.c_str());
             }
         }
     }
 
-    // 聊天中输入 .udrt/.xml 路径：自动读取文件内容注入用户消息
+    // 聊天中输入 .udrt/.xml/.avatar 路径：自动读取文件内容注入用户消息
     {
         size_t searchPos = 0;
         while (searchPos < message.size()) {
@@ -445,7 +653,8 @@ void HttpServer::handleChatStream(const Request& req, Response& res) {
             std::string candidate = message.substr(searchPos, extEnd - searchPos);
             bool isUdrt = candidate.size() > 5 && candidate.substr(candidate.size() - 5) == ".udrt";
             bool isXml  = candidate.size() > 4 && candidate.substr(candidate.size() - 4) == ".xml";
-            if ((isUdrt || isXml) &&
+            bool isAvat = candidate.size() > 7 && candidate.substr(candidate.size() - 7) == ".avatar";
+            if ((isUdrt || isXml || isAvat) &&
                 (candidate.find('\\') != std::string::npos || candidate.find('/') != std::string::npos)) {
                 // 尝试读取文件
                 int wl = MultiByteToWideChar(CP_UTF8, 0, candidate.c_str(), (int)candidate.size(), nullptr, 0);
@@ -458,18 +667,24 @@ void HttpServer::handleChatStream(const Request& req, Response& res) {
                         std::string fileContent((std::istreambuf_iterator<char>(ifs)),
                                                 std::istreambuf_iterator<char>());
                         if (!fileContent.empty()) {
-                            // 保存副本到 uploads
-                            std::string upDir = config_.exe_dir + "\\uploads\\" + chatId;
+                            // V1.5.1: 工程文件(.udrt/.avatar)全量复制到 projects\{chat_id}——
+                            // 副本即唯一工作文件（源文件与项目解耦）；.xml 仍存 uploads
+                            const std::string baseDir = config_.exe_dir + "\\" +
+                                (isAvat || isUdrt ? "projects\\" : "uploads\\") + chatId;
                             std::error_code fsec;
-                            std::filesystem::create_directories(upDir, fsec);
+                            std::filesystem::create_directories(baseDir, fsec);
                             size_t slash = candidate.find_last_of("\\/");
                             std::string baseName = (slash != std::string::npos) ? candidate.substr(slash + 1) : candidate;
-                            std::string copyPath = upDir + "\\" + baseName;
+                            std::string copyPath = baseDir + "\\" + baseName;
                             std::ofstream cp(copyPath, std::ios::binary | std::ios::trunc);
                             if (cp) { cp << fileContent; }
-                            // 追加到附件上下文
-                            attachmentContext += "\n\n--- 文件: " + candidate + " ---\n" + fileContent.substr(0, 12000);
-                            Logf("[path_input] auto-read %s (%zu bytes)", candidate.c_str(), fileContent.size());
+                            // 按需发送：.avatar 内容不注入（解析在工具内完成，只给副本路径）；
+                            // .udrt/.xml 内容注入（截断 12000 字节，供分析类回复）
+                            if (!isAvat)
+                                attachmentContext += "\n\n--- 文件: " + candidate + " ---\n" + fileContent.substr(0, 12000);
+                            attachmentContext += "\n\n[文件 " + baseName + " 已复制到工作目录: " + copyPath + "]";
+                            Logf("[path_input] auto-read %s (%zu bytes) -> %s",
+                                 candidate.c_str(), fileContent.size(), copyPath.c_str());
                         }
                     }
                 }
@@ -509,7 +724,7 @@ void HttpServer::handleChatStream(const Request& req, Response& res) {
             };
 
             std::string err;
-            std::string reply = agent_.run(message, history, eventSink, &err);
+            std::string reply = agent_.run(message, history, eventSink, &err, chatId);
 
             if (reply.empty()) {
                 if (err.empty()) err = "empty reply";

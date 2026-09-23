@@ -133,9 +133,9 @@ nlohmann::json ChatStore::listChats() const {
                        {"archived", chat.archived},
                        {"archivedAtMs", chat.archivedAtMs}});
     }
-    // 稳定呈现顺序：按创建时间升序（旧的在上，重启前后一致）
+    // 稳定呈现顺序：按创建时间降序（最近会话在上）
     std::sort(arr.begin(), arr.end(), [](const json& a, const json& b) {
-        return a["created_at"].get<long long>() < b["created_at"].get<long long>();
+        return a["created_at"].get<long long>() > b["created_at"].get<long long>();
     });
     return arr;
 }

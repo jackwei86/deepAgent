@@ -41,9 +41,11 @@ public:
 
     // 运行一轮对话：优先 Agent Loop（LLM 自主工具调用），
     // 工具协议不可用时回退固定管线。返回最终回复。
+    // chatId（V1.5.1）：归属会话，写入工程资产上下文供删除联动清理。
     std::string run(const std::string& userMessage,
                     const std::vector<ChatMessage>& history,
-                    const EventSink& sink, std::string* error);
+                    const EventSink& sink, std::string* error,
+                    const std::string& chatId = {});
 
     // ---- 工具执行器（供 neograph::llm::Agent 的 tool_calls 调用）----
     // 各执行器返回 JSON 字符串（回填给 LLM 的工具结果）。
@@ -56,7 +58,22 @@ public:
                                       const std::string& text, std::optional<bool> background,
                                       const std::string& outputFile = {});
     std::string toolReviewAsset(const std::string& path) const;
+    std::string toolCreateAvatarAssets(const std::string& path, const std::string& stylePrompt,
+                                       std::optional<bool> background);
     std::string toolGetNodeContext(const std::string& guid) const;
+    // V1.5.1: 按需查询资产上下文（LLM 工具 get_asset_context）
+    std::string toolGetAssetContext(const std::string& guid) const;
+
+    // V1.5.1: 重跑字幕资产管线（notify 重生成共用）：样式按记录恢复
+    std::string rerunSubtitlePipeline(const std::string& guid, const std::string& text,
+                                      const std::string& style, bool background,
+                                      std::string* err) const;
+
+    // V1.5.0 R3: exe notify → 单节点重生成（按 {stem}.assets.json manifest 定位，
+    // 回写同一 html，version+1，并经 EventHub 推 asset_updated）。返回 JSON 结果。
+    // V1.5.1: 恢复 AssetContext 记录的 style_prompt/background；支持 guid 直查。
+    std::string regenerateAvatarNode(const std::string& project, const std::string& nodePtr,
+                                     const std::string& nodeId, const std::string& newText);
 
 private:
     // ---- 旧固定管线（fallback：LLM tools 协议异常时回退）----
@@ -65,6 +82,8 @@ private:
                                   const EventSink& sink, std::string* error);
     // 绝对路径 → 相对 exe 目录（与 /api/asset/content 的 path 参数协议一致）
     std::string makeRelative(const std::string& absolute) const;
+    // V1.5.0: 工程宿主进程启动（AUTO_LAUNCH=1 自动；=0 发状态提示手动端点）
+    void autoLaunchProject(const std::string& kind, const std::string& projectPath) const;
     nlohmann::json analyzeIntent(const std::string& userMessage, std::string* llmError);
     nlohmann::json analyzeIntentByKeywords(const std::string& userMessage) const;
     bool planGraph(const nlohmann::json& entry, const nlohmann::json& intent,
@@ -79,6 +98,7 @@ private:
     const UdrtCompiler& compiler_;
     NodeContextStore& nodeContexts_;
     const EventSink* m_activeSink = nullptr;   // run() 期间有效，工具执行器用于发事件
+    std::string m_chatId;                      // run() 期间有效（V1.5.1 归属会话记录）
     // P3: create_udrt 进程内缓存（相同参数不重复调 LLM）
     std::string m_lastCreateUdrtHash;
     std::string m_lastCreateUdrtResult;

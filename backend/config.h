@@ -33,6 +33,12 @@ struct Config {
     std::string udrt_output_dir;     // 默认 <exe_dir>\udrt（相对路径基准目录）
     std::string chats_file;
 
+    // 工程宿主进程启动（V1.5.0）：auto_launch=1 时资产生成完自动启动对应 exe；
+    // 默认关（两 exe 直接启动目前由用户完善中），可 POST /api/launch 手动启动
+    bool auto_launch = false;
+    std::string avatar_exe;          // 默认 <exe_dir>\Avatar.exe
+    std::string udrt_exe;            // 默认 <exe_dir>\UDeepRT.exe
+
     // Load from <root>/config/.env with env-var overrides.
     // root_dir: directory that contains frontend/, knowledge/, config/, output/.
     static Config load(const std::string& root_dir, const std::string& exe_dir);

@@ -1,0 +1,2343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AvatarProject version="1.0.0">
+    <RenderResults>
+        <Result key="a9c2ecd23c385d2e81ae61753f457be0" file="D:\Media Resource\capture\20260909_175209.mp4"/>
+    </RenderResults>
+    <timeline version="20260715" mode="full_project">
+        <plugins>
+            <plugin id="org.uranus.plugin.uranus_track_plugin" name="UranusTrackPlugin" api_version="1" track_id="org.uranus.track.voice_text"/>
+        </plugins>
+        <project version="1">
+            <uuid>{05f1ddf5-b0dd-431a-8c48-211c2818f034}</uuid>
+            <nodes>
+                <node version="1" id="org.qtimeline.folder" ptr="1872516082944">
+                    <label>Root</label>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <children>
+                            <child>1872130950960</child>
+                            <child>1872856460304</child>
+                        </children>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.sequence" ptr="1872130950960">
+                    <label>序列</label>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>28</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>0</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track>
+                                        <samplerate>48000</samplerate>
+                                        <channels>1</channels>
+                                        <format>8</format>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <duration>0</duration>
+                                        <timebase>1/48000</timebase>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <workarea version="1">
+                            <enabled>0</enabled>
+                            <in>0/1</in>
+                            <out>0/1</out>
+                        </workarea>
+                        <markers/>
+                        <tracks>
+                            <track type="0" type_id="org.qtimeline.track.video" index="0" version="1" id="org.qtimeline.track" ptr="1872136423408">
+                                <param key="enabled_in">
+                                    <primary>
+                                        <standard>
+                                            <track>true</track>
+                                        </standard>
+                                    </primary>
+                                </param>
+                                <param key="muted_in">
+                                    <primary>
+                                        <standard>
+                                            <track>false</track>
+                                        </standard>
+                                    </primary>
+                                </param>
+                                <custom>
+                                    <height>3</height>
+                                    <blocks>
+                                        <block>1872814966608</block>
+                                        <block>1872814969856</block>
+                                        <block>1872814955472</block>
+                                        <block>1872814958256</block>
+                                        <block>1872814974032</block>
+                                        <block>1872814952224</block>
+                                        <block>1872814967072</block>
+                                        <block>1872814953616</block>
+                                        <block>1872814954080</block>
+                                        <block>1872814979136</block>
+                                    </blocks>
+                                </custom>
+                            </track>
+                            <track type="0" type_id="org.qtimeline.track.video" index="1" version="1" id="org.qtimeline.track" ptr="1872136421632">
+                                <param key="enabled_in">
+                                    <primary>
+                                        <standard>
+                                            <track>true</track>
+                                        </standard>
+                                    </primary>
+                                </param>
+                                <param key="muted_in">
+                                    <primary>
+                                        <standard>
+                                            <track>false</track>
+                                        </standard>
+                                    </primary>
+                                </param>
+                                <custom>
+                                    <height>3</height>
+                                    <blocks>
+                                        <block>1872950153632</block>
+                                    </blocks>
+                                </custom>
+                            </track>
+                            <track type="4" type_id="org.uranus.track.voice_text" index="0" version="1" id="org.qtimeline.track" ptr="1871594081072">
+                                <param key="enabled_in">
+                                    <primary>
+                                        <standard>
+                                            <track>true</track>
+                                        </standard>
+                                    </primary>
+                                </param>
+                                <param key="muted_in">
+                                    <primary>
+                                        <standard>
+                                            <track>false</track>
+                                        </standard>
+                                    </primary>
+                                </param>
+                                <custom>
+                                    <height>3</height>
+                                    <blocks>
+                                        <block>1872858413680</block>
+                                        <block>1872858411312</block>
+                                        <block>1871314156448</block>
+                                        <block>1872858414272</block>
+                                    </blocks>
+                                </custom>
+                            </track>
+                        </tracks>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.footage" ptr="1872856460304">
+                    <label>1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</label>
+                    <param key="file_in">
+                        <primary>
+                            <standard>
+                                <track>D:/Media Resource/Video/1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>0</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>506</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track>
+                                        <samplerate>44100</samplerate>
+                                        <channels>1</channels>
+                                        <format>8</format>
+                                        <enabled>1</enabled>
+                                        <streamindex>1</streamindex>
+                                        <duration>887777</duration>
+                                        <timebase>1/44100</timebase>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <context>
+                        <node ptr="1872856460304">
+                            <x>0</x>
+                            <y>0</y>
+                            <expanded>0</expanded>
+                        </node>
+                    </context>
+                    <custom>
+                        <timestamp>1781513267341</timestamp>
+                        <element>
+                            <kind>Movie</kind>
+                        </element>
+                        <viewer>
+                            <workarea version="1">
+                                <enabled>0</enabled>
+                                <in>0/1</in>
+                                <out>0/1</out>
+                            </workarea>
+                            <markers/>
+                        </viewer>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.clip" ptr="1872814966608">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>253/25</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <context>
+                        <node ptr="1872856460304">
+                            <x>-4</x>
+                            <y>0</y>
+                            <expanded>0</expanded>
+                        </node>
+                        <node ptr="1872814966608">
+                            <x>0</x>
+                            <y>0</y>
+                            <expanded>0</expanded>
+                        </node>
+                    </context>
+                    <custom>
+                        <element>
+                            <kind>movie</kind>
+                            <filename>D:/Media Resource/Video/1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</filename>
+                        </element>
+                        <media-source>1872856460304</media-source>
+                    </custom>
+                </node>
+                <node version="1" id="org.uranus.block.voice_text" ptr="1872858413680">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>737/50</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="text_in">
+                        <primary>
+                            <standard>
+                                <track>加快科技创新和产业创新融合，关键在于畅通科技成果产业化渠道。今年以来，国家加快打通科技成果落地堵点，让科技创新加速走向生产线。</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="wav_out">
+                        <primary>
+                            <standard>
+                                <track>c5c8d3df744e7d84f8df78c94f81ccce.wav</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="wav_md5">
+                        <primary>
+                            <standard>
+                                <track>c5c8d3df744e7d84f8df78c94f81ccce</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>audio</kind>
+                            <filename>D:/TotemMeta/MetaSDK/x64/Debug/Temp/Uranus/project/c5c8d3df744e7d84f8df78c94f81ccce.wav</filename>
+                        </element>
+                    </custom>
+                </node>
+                <node version="1" id="org.uranus.block.voice_text" ptr="1872858411312">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>213/5</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="text_in">
+                        <primary>
+                            <standard>
+                                <track>为破解科研成果和产业需求脱节的难题，今年以来，我国加速建设科技成果转化的全链条服务体系。在研发端，为提升我国制造领域关键共性技术的供给能力，国家新成立2家国家制造业创新中心，目前已累计达到32家。在中试环节，形成了由21家国家级制造业中试平台和1800多家储备平台组成的中试服务网络。在孵化阶段，全国共认定首批14家卓越级和402家标准级科技型企业孵化器，孵化企业和团队超过42.5万家。</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="wav_out">
+                        <primary>
+                            <standard>
+                                <track>38f62ab340293aa5b62b53951ff9cacd.wav</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="wav_md5">
+                        <primary>
+                            <standard>
+                                <track>38f62ab340293aa5b62b53951ff9cacd</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>audio</kind>
+                            <filename>D:/TotemMeta/MetaSDK/x64/Debug/Temp/Uranus/project/38f62ab340293aa5b62b53951ff9cacd.wav</filename>
+                        </element>
+                    </custom>
+                </node>
+                <node version="1" id="org.uranus.block.voice_text" ptr="1871314156448">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>622/25</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="text_in">
+                        <primary>
+                            <standard>
+                                <track>此外，一些科技创新公司本身的技术成果过硬，但却受到地区和渠道限制，难以对接全国市场。目前，国家正加紧培育一体化的技术市场。在山东，科技大市场已经可以利用大模型技术实现智能匹配，让企业从“大海捞针找技术”到“系统主动推送适配成果”。</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="wav_out">
+                        <primary>
+                            <standard>
+                                <track>cfc1a43d48e4d09f8ba8b6b5cf379395.wav</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="wav_md5">
+                        <primary>
+                            <standard>
+                                <track>cfc1a43d48e4d09f8ba8b6b5cf379395</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>audio</kind>
+                            <filename>D:/TotemMeta/MetaSDK/x64/Debug/Temp/Uranus/project/cfc1a43d48e4d09f8ba8b6b5cf379395.wav</filename>
+                        </element>
+                    </custom>
+                </node>
+                <node version="1" id="org.uranus.block.voice_text" ptr="1872858414272">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>456/25</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="text_in">
+                        <primary>
+                            <standard>
+                                <track>目前，国家正在加紧制定政策，建设国家统一技术交易服务平台。从技术验证到企业孵化，再到打通交易市场，一条覆盖研发、中试、孵化、交易的全链条科技服务体系正在加速形成。</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="wav_out">
+                        <primary>
+                            <standard>
+                                <track>d1e31a7d22bfa2647e2a60b7da555fcf.wav</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="wav_md5">
+                        <primary>
+                            <standard>
+                                <track>d1e31a7d22bfa2647e2a60b7da555fcf</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>audio</kind>
+                            <filename>D:/TotemMeta/MetaSDK/x64/Debug/Temp/Uranus/project/d1e31a7d22bfa2647e2a60b7da555fcf.wav</filename>
+                        </element>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.footage" ptr="1872856487264">
+                    <label>1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</label>
+                    <param key="file_in">
+                        <primary>
+                            <standard>
+                                <track>D:/Media Resource/Video\1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>0</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>502</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <timestamp>1781513265136</timestamp>
+                        <element>
+                            <kind>Movie</kind>
+                        </element>
+                        <viewer>
+                            <workarea version="1">
+                                <enabled>0</enabled>
+                                <in>0/1</in>
+                                <out>0/1</out>
+                            </workarea>
+                            <markers/>
+                        </viewer>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.clip" ptr="1872814969856">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>251/25</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>movie</kind>
+                            <filename>D:/Media Resource/Video\1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</filename>
+                        </element>
+                        <media-source>1872856487264</media-source>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.footage" ptr="1872856489856">
+                    <label>1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</label>
+                    <param key="file_in">
+                        <primary>
+                            <standard>
+                                <track>D:/Media Resource/Video/1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>0</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>506</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track>
+                                        <samplerate>44100</samplerate>
+                                        <channels>1</channels>
+                                        <format>8</format>
+                                        <enabled>1</enabled>
+                                        <streamindex>1</streamindex>
+                                        <duration>887777</duration>
+                                        <timebase>1/44100</timebase>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <timestamp>1781513267341</timestamp>
+                        <element>
+                            <kind>Movie</kind>
+                        </element>
+                        <viewer>
+                            <workarea version="1">
+                                <enabled>0</enabled>
+                                <in>0/1</in>
+                                <out>0/1</out>
+                            </workarea>
+                            <markers/>
+                        </viewer>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.clip" ptr="1872814955472">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>253/25</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>movie</kind>
+                            <filename>D:/Media Resource/Video/1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</filename>
+                        </element>
+                        <media-source>1872856489856</media-source>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.footage" ptr="1872856488128">
+                    <label>1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</label>
+                    <param key="file_in">
+                        <primary>
+                            <standard>
+                                <track>D:/Media Resource/Video\1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>0</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>502</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <timestamp>1781513265136</timestamp>
+                        <element>
+                            <kind>Movie</kind>
+                        </element>
+                        <viewer>
+                            <workarea version="1">
+                                <enabled>0</enabled>
+                                <in>0/1</in>
+                                <out>0/1</out>
+                            </workarea>
+                            <markers/>
+                        </viewer>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.clip" ptr="1872814958256">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>251/25</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>movie</kind>
+                            <filename>D:/Media Resource/Video\1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</filename>
+                        </element>
+                        <media-source>1872856488128</media-source>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.footage" ptr="1872856488992">
+                    <label>1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</label>
+                    <param key="file_in">
+                        <primary>
+                            <standard>
+                                <track>D:/Media Resource/Video/1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>0</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>506</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track>
+                                        <samplerate>44100</samplerate>
+                                        <channels>1</channels>
+                                        <format>8</format>
+                                        <enabled>1</enabled>
+                                        <streamindex>1</streamindex>
+                                        <duration>887777</duration>
+                                        <timebase>1/44100</timebase>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <timestamp>1781513267341</timestamp>
+                        <element>
+                            <kind>Movie</kind>
+                        </element>
+                        <viewer>
+                            <workarea version="1">
+                                <enabled>0</enabled>
+                                <in>0/1</in>
+                                <out>0/1</out>
+                            </workarea>
+                            <markers/>
+                        </viewer>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.clip" ptr="1872814974032">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>253/25</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>movie</kind>
+                            <filename>D:/Media Resource/Video/1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</filename>
+                        </element>
+                        <media-source>1872856488992</media-source>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.footage" ptr="1872856490720">
+                    <label>1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</label>
+                    <param key="file_in">
+                        <primary>
+                            <standard>
+                                <track>D:/Media Resource/Video\1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>0</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>502</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <timestamp>1781513265136</timestamp>
+                        <element>
+                            <kind>Movie</kind>
+                        </element>
+                        <viewer>
+                            <workarea version="1">
+                                <enabled>0</enabled>
+                                <in>0/1</in>
+                                <out>0/1</out>
+                            </workarea>
+                            <markers/>
+                        </viewer>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.clip" ptr="1872814952224">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>251/25</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>movie</kind>
+                            <filename>D:/Media Resource/Video\1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</filename>
+                        </element>
+                        <media-source>1872856490720</media-source>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.footage" ptr="1872856483808">
+                    <label>1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</label>
+                    <param key="file_in">
+                        <primary>
+                            <standard>
+                                <track>D:/Media Resource/Video/1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>0</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>506</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track>
+                                        <samplerate>44100</samplerate>
+                                        <channels>1</channels>
+                                        <format>8</format>
+                                        <enabled>1</enabled>
+                                        <streamindex>1</streamindex>
+                                        <duration>887777</duration>
+                                        <timebase>1/44100</timebase>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <timestamp>1781513267341</timestamp>
+                        <element>
+                            <kind>Movie</kind>
+                        </element>
+                        <viewer>
+                            <workarea version="1">
+                                <enabled>0</enabled>
+                                <in>0/1</in>
+                                <out>0/1</out>
+                            </workarea>
+                            <markers/>
+                        </viewer>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.clip" ptr="1872814967072">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>253/25</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>movie</kind>
+                            <filename>D:/Media Resource/Video/1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</filename>
+                        </element>
+                        <media-source>1872856483808</media-source>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.footage" ptr="1872856484672">
+                    <label>1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</label>
+                    <param key="file_in">
+                        <primary>
+                            <standard>
+                                <track>D:/Media Resource/Video\1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>0</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>502</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <timestamp>1781513265136</timestamp>
+                        <element>
+                            <kind>Movie</kind>
+                        </element>
+                        <viewer>
+                            <workarea version="1">
+                                <enabled>0</enabled>
+                                <in>0/1</in>
+                                <out>0/1</out>
+                            </workarea>
+                            <markers/>
+                        </viewer>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.clip" ptr="1872814953616">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>251/25</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>movie</kind>
+                            <filename>D:/Media Resource/Video\1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</filename>
+                        </element>
+                        <media-source>1872856484672</media-source>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.footage" ptr="1872856485536">
+                    <label>1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</label>
+                    <param key="file_in">
+                        <primary>
+                            <standard>
+                                <track>D:/Media Resource/Video/1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>0</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>506</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track>
+                                        <samplerate>44100</samplerate>
+                                        <channels>1</channels>
+                                        <format>8</format>
+                                        <enabled>1</enabled>
+                                        <streamindex>1</streamindex>
+                                        <duration>887777</duration>
+                                        <timebase>1/44100</timebase>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <timestamp>1781513267341</timestamp>
+                        <element>
+                            <kind>Movie</kind>
+                        </element>
+                        <viewer>
+                            <workarea version="1">
+                                <enabled>0</enabled>
+                                <in>0/1</in>
+                                <out>0/1</out>
+                            </workarea>
+                            <markers/>
+                        </viewer>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.clip" ptr="1872814954080">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>253/25</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>movie</kind>
+                            <filename>D:/Media Resource/Video/1月16日_6793d796-7caa-4cec-93c2-9da218c79260.mp4</filename>
+                        </element>
+                        <media-source>1872856485536</media-source>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.footage" ptr="1872828295008">
+                    <label>1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</label>
+                    <param key="file_in">
+                        <primary>
+                            <standard>
+                                <track>D:/Media Resource/Video\1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>0</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>502</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <timestamp>1781513265136</timestamp>
+                        <element>
+                            <kind>Movie</kind>
+                        </element>
+                        <viewer>
+                            <workarea version="1">
+                                <enabled>0</enabled>
+                                <in>0/1</in>
+                                <out>0/1</out>
+                            </workarea>
+                            <markers/>
+                        </viewer>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.clip" ptr="1872814979136">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>97/10</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>movie</kind>
+                            <filename>D:/Media Resource/Video\1月16日_6793d796-7caa-4cec-93c2-9da218c79260_Reverse.mp4</filename>
+                        </element>
+                        <media-source>1872828295008</media-source>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.footage" ptr="1872949831184">
+                    <label>20260909_175209.mp4</label>
+                    <param key="file_in">
+                        <primary>
+                            <standard>
+                                <track>D:\Media Resource\capture\20260909_175209.mp4</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="video_param_in">
+                        <primary>
+                            <standard>
+                                <track version="1">
+                                    <width>0</width>
+                                    <height>0</height>
+                                    <timebase>0/1</timebase>
+                                    <format>-1</format>
+                                    <pixelaspectratio>0/1</pixelaspectratio>
+                                    <scanmode>3</scanmode>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <videotype>0</videotype>
+                                    <framerate>0/1</framerate>
+                                    <starttime>0</starttime>
+                                    <duration>0</duration>
+                                    <colorspace>1</colorspace>
+                                    <colorrange>1</colorrange>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track version="1">
+                                        <width>1920</width>
+                                        <height>1080</height>
+                                        <timebase>1/50</timebase>
+                                        <format>0</format>
+                                        <pixelaspectratio>1/1</pixelaspectratio>
+                                        <scanmode>3</scanmode>
+                                        <enabled>1</enabled>
+                                        <streamindex>0</streamindex>
+                                        <videotype>0</videotype>
+                                        <framerate>50/1</framerate>
+                                        <starttime>0</starttime>
+                                        <duration>299</duration>
+                                        <colorspace>1</colorspace>
+                                        <colorrange>1</colorrange>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="audio_param_in">
+                        <primary>
+                            <standard>
+                                <track>
+                                    <samplerate>0</samplerate>
+                                    <channels>0</channels>
+                                    <format>-1</format>
+                                    <enabled>1</enabled>
+                                    <streamindex>0</streamindex>
+                                    <duration>0</duration>
+                                    <timebase>0/1</timebase>
+                                </track>
+                            </standard>
+                        </primary>
+                        <subelements count="1">
+                            <element>
+                                <standard>
+                                    <track>
+                                        <samplerate>48000</samplerate>
+                                        <channels>2</channels>
+                                        <format>8</format>
+                                        <enabled>1</enabled>
+                                        <streamindex>1</streamindex>
+                                        <duration>287712</duration>
+                                        <timebase>1/48000</timebase>
+                                    </track>
+                                </standard>
+                            </element>
+                        </subelements>
+                    </param>
+                    <param key="subtitle_param_in">
+                        <primary>
+                            <standard>
+                                <track></track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <timestamp>1788947536884</timestamp>
+                        <element>
+                            <kind>Movie</kind>
+                        </element>
+                        <viewer>
+                            <workarea version="1">
+                                <enabled>0</enabled>
+                                <in>0/1</in>
+                                <out>0/1</out>
+                            </workarea>
+                            <markers/>
+                        </viewer>
+                    </custom>
+                </node>
+                <node version="1" id="org.qtimeline.clip" ptr="1872950153632">
+                    <param key="enabled_in">
+                        <primary>
+                            <standard>
+                                <track>true</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="length_in">
+                        <primary>
+                            <standard>
+                                <track>299/50</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="media_in_in">
+                        <primary>
+                            <standard>
+                                <track>0/1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="speed_in">
+                        <primary>
+                            <standard>
+                                <track>1</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="reverse_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="maintain_audio_pitch_in">
+                        <primary>
+                            <standard>
+                                <track>false</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <param key="loop_in">
+                        <primary>
+                            <standard>
+                                <track>0</track>
+                            </standard>
+                        </primary>
+                    </param>
+                    <custom>
+                        <element>
+                            <kind>movie</kind>
+                            <filename>D:\Media Resource\capture\20260909_175209.mp4</filename>
+                        </element>
+                        <media-source>1872949831184</media-source>
+                    </custom>
+                </node>
+            </nodes>
+            <settings>
+                <root>1872516082944</root>
+            </settings>
+        </project>
+        <session version="1">
+            <data/>
+        </session>
+    </timeline>
+</AvatarProject>

@@ -7,7 +7,7 @@ set NG=E:\totem_AI\DeepAgent\third_party\NeoGraph
 set QJS=%NG%\build\generated\quickjs-msvc
 set INC=/I "%~dp0." /I "%~dp0third_party" /I "%NG%\include" /I "%NG%\deps\asio\include" /I "%NG%\deps\yyjson" /I "%NG%\deps" /I "%QJS%"
 set DEF=/D NEOGRAPH_STATIC_BUILD /D ASIO_STANDALONE /D ASIO_NO_DEPRECATED /D _WIN32_WINNT=0x0A00 /D WIN32_LEAN_AND_MEAN /D NOMINMAX /D _CRT_SECURE_NO_WARNINGS
-set CXXFLAGS=/nologo /std:c++20 /utf-8 /MDd /EHsc /GR /permissive- /W3 /Od
+set CXXFLAGS=/nologo /Zi /std:c++20 /utf-8 /MDd /EHsc /GR /permissive- /W3 /Od
 
 cd /d %~dp0
 
@@ -23,7 +23,8 @@ for %%f in (quickjs cutils dtoa libregexp libunicode) do (
 
 cl %CXXFLAGS% %INC% %DEF% ^
   asset_feature_test.cpp asset_pipeline.cpp asset_adapters.cpp asset_runner.cpp ^
-  plan_script.cpp udrt_compiler.cpp node_catalog.cpp quickjs.obj cutils.obj dtoa.obj libregexp.obj libunicode.obj ^
+  plan_script.cpp udrt_compiler.cpp node_catalog.cpp avatar_parser.cpp event_hub.cpp asset_context.cpp ^
+  quickjs.obj cutils.obj dtoa.obj libregexp.obj libunicode.obj ^
   /Fe:asset_feature_test.exe ^
   /link /LIBPATH:"%NG%\build\Debug" /LIBPATH:"D:\ProgramData\Anaconda3\Library\lib" ^
   neograph_core.lib neograph_llm.lib neograph_async.lib yyjson.lib libcrypto.lib libssl.lib ole32.lib

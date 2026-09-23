@@ -5,13 +5,21 @@
 #include <string.h>
 #include <sstream>
 
+#include "asset_context.h"
 #include "asset_pipeline.h"
 #include "asset_runner.h"
+#include "avatar_parser.h"
+#include "event_hub.h"
 #include "log.h"
 #include "plan_script.h"
+#include "process_launcher.h"
 #include "winhttp_provider.h"
 
+#include <combaseapi.h>
 #include <filesystem>
+
+#include <ctime>
+#include <mutex>
 
 #include <neograph/llm/agent.h>
 #include <neograph/llm/openai_provider.h>
@@ -125,6 +133,18 @@ std::string statusText(const json& entry) {
     return entry.value("name", "") + " (" + entry.value("module_id", "") + ")";
 }
 
+// GUID 生成（与 udrt_compiler::newGuid 同格式：32 位大写十六进制无连字符）
+std::string makeGuid() {
+    GUID g{};
+    if (FAILED(CoCreateGuid(&g))) return {};
+    char buf[64] = {};
+    snprintf(buf, sizeof(buf), "%08X%04X%04X%02X%02X%02X%02X%02X%02X%02X%02X",
+             (unsigned)g.Data1, (unsigned)g.Data2, (unsigned)g.Data3,
+             g.Data4[0], g.Data4[1], g.Data4[2], g.Data4[3],
+             g.Data4[4], g.Data4[5], g.Data4[6], g.Data4[7]);
+    return buf;
+}
+
 // SHA-256 hex digest（用于 inputHash 缓存判重）
 std::string sha256Hex(const std::string& data) {
     NTSTATUS st;
@@ -165,6 +185,11 @@ std::string buildOrchestratorInstructions(const KnowledgeBase& kb) {
         << "   c) 存在问题时：调 generate_node_asset（kind=prompt，text=具体明确的修改指令，\n"
         << "      output_file=review_asset 返回的 path）覆盖优化，然后汇报修改点；\n"
         << "   d) 质量已良好时：不调用优化，简要说明评估结论即可。\n"
+        << "6. 用户提供 .avatar 工程文件（附件或路径）：调 create_avatar_assets（path=文件\n"
+        << "   路径；可选 style_prompt/background），其会解析全部字幕节点并批量生成 HTML；\n"
+        << "   完成后在最终回答中报告每个节点的产出文件。\n"
+        << "7. 需要了解某资产的历史版本/生成参数时：调 get_asset_context（按需查询，\n"
+        << "   不要凭记忆猜测资产的生成参数）。\n"
         << "重要：工具调用过程中禁止输出过渡性文字（例如\"我将要调用…\"\"现在我来创建…\"），\n"
         << "每一轮要么发起工具调用，要么在全部工具执行完毕后输出最终中文汇报；\n"
         << "生成类工具调用完成后，在最终回答中报告产出文件路径；\n"
@@ -304,6 +329,62 @@ public:
     }
 
     std::string get_name() const override { return "review_asset"; }
+};
+
+// 按需查询资产上下文（V1.5.1：GUID → 生成参数/版本轨迹，LLM 不必常驻这些信息）
+class GetAssetContextTool final : public ToolBase {
+public:
+    using ToolBase::ToolBase;
+
+    neograph::ChatTool get_definition() const override {
+        return {"get_asset_context",
+            "查询指定 GUID 资产的操作上下文：生成参数（样式要求/背景开关/来源工程）、"
+            "当前文本、版本轨迹。用于回答\"这个资产是怎么生成的\"或优化前了解背景。",
+            neograph::json{
+                {"type", "object"},
+                {"properties", {
+                    {"guid", {{"type", "string"}, {"description", "资产节点 GUID"}}}
+                }},
+                {"required", neograph::json::array({"guid"})}}};
+    }
+
+    std::string execute(const neograph::json& args) override {
+        return owner_->toolGetAssetContext(args.value("guid", ""));
+    }
+
+    std::string get_name() const override { return "get_asset_context"; }
+};
+
+// .avatar 工程输入：解析全部 text_in 字幕节点，批量生成 HTML 资产（V1.5.0 R1）
+class CreateAvatarAssetsTool final : public ToolBase {
+public:
+    using ToolBase::ToolBase;
+
+    neograph::ChatTool get_definition() const override {
+        return {"create_avatar_assets",
+            "解析 .avatar 工程文件（AvatarProject XML）中全部字幕节点（param key=text_in），"
+            "为每个节点批量生成一个 HTML 字幕资产文件，并生成节点↔文件映射清单。",
+            neograph::json{
+                {"type", "object"},
+                {"properties", {
+                    {"path", {{"type", "string"}, {"description", ".avatar 文件路径（相对或绝对）"}}},
+                    {"style_prompt", {{"type", "string"}, {"description", "样式要求（字体/字号/颜色等，可空）"}}},
+                    {"background", {{"type", "boolean"}, {"description", "是否启用背景板分支（可空=自动判断）"}}}
+                }},
+                {"required", neograph::json::array({"path"})}}};
+    }
+
+    std::string execute(const neograph::json& args) override {
+        std::optional<bool> background;
+        if (args.contains("background") && args["background"].is_boolean())
+            background = args["background"].get<bool>();
+        return owner_->toolCreateAvatarAssets(
+            args.value("path", ""),
+            args.value("style_prompt", ""),
+            background);
+    }
+
+    std::string get_name() const override { return "create_avatar_assets"; }
 };
 
 class GetNodeContextTool final : public ToolBase {
@@ -526,6 +607,36 @@ std::string AgentGraph::toolCreateUdrt(const std::string& entryId,
         }
     }
 
+    // V1.5.0 R2: 生成完成后启动 UDeepRT.exe 加载工程（AUTO_LAUNCH 开关控制）
+    autoLaunchProject("udrt", udrtPath);
+
+    // V1.5.1: 写工程资产上下文（.udrt 生于 udrt 目录，本身就是工作工程文件）
+    {
+        AssetContextStore ctxStore(config_.udrt_output_dir);
+        AssetContext c;
+        c.guid = guid;
+        c.kind = "udrt_subtitle";
+        c.sourceFile = udrtPath;
+        c.entryId = entryId;
+        c.stylePrompt = stylePrompt;
+        c.background = wantsBackground(background, subtitleText, stylePrompt);
+        c.text = subtitleText;
+        c.htmlFile = htmlFile;
+        c.version = 1;
+        c.chatId = m_chatId;
+        std::string cerr2;
+        ctxStore.record(c, &cerr2);
+    }
+
+    // R3: 通知订阅该工程的 exe（udrt 工程文件已生成）
+    EventHub::instance().publish("asset_updated",
+                                 json{{"project", udrtPath},
+                                      {"guid", guid},
+                                      {"file", makeRelative(udrtPath)},
+                                      {"version", 1},
+                                      {"reason", "create"}},
+                                 udrtPath);
+
     // P3: inputHash 进程内缓存
     m_lastCreateUdrtHash = sha256Hex(
         entryId + "|" + subtitleText + "|" + stylePrompt + "|" + config_.llm_model);
@@ -659,6 +770,16 @@ std::string AgentGraph::toolGenerateNodeAsset(const std::string& guid,
                                        {"guid", guid},
                                        {"version", 2}});
         }
+        // R3: 广播资产更新（优化回写；无项目上下文，全部订阅者可收）
+        EventHub::instance().publish("asset_updated",
+                                     json{{"guid", guid},
+                                          {"file", makeRelative(abs)},
+                                          {"version", 2},
+                                          {"reason", "optimize"}});
+        // V1.5.1: 追加资产上下文历史（version+1；无记录时忽略——纯节点资产无上下文）
+        AssetContextStore ctxStore(config_.udrt_output_dir);
+        std::string cerr2;
+        ctxStore.appendHistory(guid, "optimize", r.final_html, "chat", &cerr2);
     }
     return ok.dump();
 }
@@ -687,9 +808,380 @@ std::string AgentGraph::toolReviewAsset(const std::string& path) const {
     ss << ifs.rdbuf();
     std::string html = ss.str();
     if (html.size() > 64 * 1024) html.resize(64 * 1024);  // 防超长资产撑爆上下文
-    return json{{"path", abs},
-                {"bytes", html.size()},
-                {"html", html}}.dump();
+    json resp{{"path", abs}, {"bytes", html.size()}, {"html", html}};
+    // V1.5.1: 附带样式切片（质检评估"是否符合用户样式要求"的依据）
+    {
+        AssetContextStore ctxStore(config_.udrt_output_dir);
+        AssetContext c;
+        if (ctxStore.findByHtml(abs, &c, nullptr)) {
+            resp["style_prompt"] = c.stylePrompt;
+            resp["entry_id"] = c.entryId;
+            resp["version"] = c.version;
+        }
+    }
+    return resp.dump();
+}
+
+std::string AgentGraph::toolCreateAvatarAssets(const std::string& path,
+                                               const std::string& stylePrompt,
+                                               std::optional<bool> background) {
+    namespace fs = std::filesystem;
+    // 1. 路径解析（工程文件是用户输入，允许任意位置：绝对/相对/按 exe_dir 兜底）
+    if (path.empty()) {
+        return json{{"error", "path is required"},
+                    {"missing", json::array({"path"})},
+                    {"repairable", true},
+                    {"hint", "path 为 .avatar 工程文件路径（附件上传或聊天中给出的路径）"}}.dump();
+    }
+    std::string p = path;
+    for (auto& ch : p) if (ch == '/') ch = '\\';
+    std::string avatarAbs;
+    std::error_code ec;
+    fs::path candidate = fs::path(p);
+    if (candidate.is_absolute()) {
+        avatarAbs = candidate.string();
+    } else {
+        fs::path byExe = fs::path(config_.exe_dir) / p;
+        if (fs::exists(byExe, ec)) avatarAbs = byExe.string();
+        else if (fs::exists(candidate, ec)) avatarAbs = candidate.string();
+        else avatarAbs = byExe.string();
+    }
+    if (!fs::exists(avatarAbs, ec)) {
+        return json{{"error", "avatar file not found: " + avatarAbs},
+                    {"repairable", true},
+                    {"hint", "文件不存在：请确认路径，或让用户通过附件上传 .avatar 文件"}}.dump();
+    }
+
+    // V1.5.1 副本约定：会话内强制复制到 projects\{chat_id}\，副本即唯一工作文件
+    // （不依赖 LLM 传参行为；源文件与项目解耦，后续修改只作用于副本）
+    if (!m_chatId.empty()) {
+        std::string projectsDir = config_.exe_dir + "\\projects\\" + m_chatId;
+        std::error_code cec;
+        fs::create_directories(projectsDir, cec);
+        std::string copyPath =
+            (fs::path(projectsDir) / fs::path(avatarAbs).filename()).string();
+        // 目标若已存在且只读（源文件只读位被 copy_file 继承），先清属性再覆盖
+        if (fs::exists(copyPath, cec))
+            fs::permissions(copyPath, fs::perms::all, cec);
+        fs::copy_file(avatarAbs, copyPath, fs::copy_options::overwrite_existing, cec);
+        if (!cec) avatarAbs = copyPath;
+    }
+
+    // 2. 解析 text_in 字幕节点
+    std::vector<AvatarTextEntry> entries;
+    std::string perr;
+    if (!parseAvatarFile(avatarAbs, &entries, &perr)) {
+        return json{{"error", perr},
+                    {"repairable", true},
+                    {"hint", "确认文件为有效的 AvatarProject XML 且含 text_in 字幕节点"}}.dump();
+    }
+    if (m_activeSink && m_activeSink->onStatus)
+        m_activeSink->onStatus("已解析 .avatar：" + std::to_string(entries.size()) +
+                               " 个字幕节点，开始批量生成…");
+
+    // 3. 批量生成（每节点一条请求，统一子步并发调度）
+    AssetRunnerConfig rc;
+    rc.api_key = config_.llm_api_key;
+    rc.base_url = config_.llm_base_url;
+    rc.model = config_.llm_model;
+    rc.system_prompt = kSubtitleSystemPrompt;
+    auto assetProvider = std::make_shared<WinHttpProvider>(llm_, config_);
+    AssetGraphRunner runner(rc, assetProvider);
+
+    std::vector<AssetRequest> reqs;
+    std::vector<std::string> guids(entries.size());
+    for (size_t i = 0; i < entries.size(); ++i) {
+        guids[i] = makeGuid();
+        AssetRequest req;
+        req.guid = guids[i];
+        req.short_id = "av" + std::to_string(i) + "_" +
+                       (guids[i].size() >= 8 ? guids[i].substr(0, 8) : guids[i]);
+        req.user_text = entries[i].text;
+        req.context = json{{"content", entries[i].text}, {"style", stylePrompt}};
+        req.wants_background = wantsBackground(background, entries[i].text, stylePrompt);
+        reqs.push_back(std::move(req));
+    }
+
+    auto results = runner.run(
+        reqs, defaultSubtitlePipeline(),
+        [this](const std::string& g, const std::string& step, const std::string& state) {
+            if (m_activeSink && m_activeSink->onNodeState)
+                m_activeSink->onNodeState(json{{"guid", g}, {"step", step}, {"state", state}});
+        });
+
+    // 4. 落盘 + manifest + 卡片事件
+    std::string stem = fs::path(avatarAbs).stem().string();
+    auto twoDigit = [](size_t i) {
+        char buf[8];
+        snprintf(buf, sizeof(buf), "%02zu", i);
+        return std::string(buf);
+    };
+
+    json manifest = json::array();
+    json files = json::array();
+    int generated = 0;
+    std::string firstHtml;
+    for (size_t i = 0; i < results.size() && i < entries.size(); ++i) {
+        const auto& r = results[i];
+        json item{{"index", entries[i].index},
+                  {"node_id", entries[i].nodeId},
+                  {"node_ptr", entries[i].nodePtr},
+                  {"guid", guids[i]},
+                  {"background", reqs[i].wants_background},
+                  {"text", entries[i].text}};
+        if (r.ok && !r.final_html.empty()) {
+            std::string htmlFile = (fs::path(config_.udrt_output_dir) /
+                                    (stem + "_" + twoDigit(i) + "_" +
+                                     (guids[i].size() >= 8 ? guids[i].substr(0, 8) : guids[i]) +
+                                     ".html"))
+                                       .string();
+            std::ofstream ofs(htmlFile, std::ios::binary | std::ios::trunc);
+            if (ofs) ofs.write(r.final_html.data(), (std::streamsize)r.final_html.size());
+            item["html_file"] = htmlFile;
+            item["file"] = makeRelative(htmlFile);
+            item["version"] = 1;
+            ++generated;
+            if (firstHtml.empty()) firstHtml = htmlFile;
+            if (m_activeSink && m_activeSink->onAsset) {
+                m_activeSink->onAsset(json{{"type", "html"},
+                                           {"file", makeRelative(htmlFile)},
+                                           {"absolute_path", htmlFile},
+                                           {"guid", guids[i]},
+                                           {"version", 1},
+                                           {"node_ptr", entries[i].nodePtr},
+                                           {"node_id", entries[i].nodeId}});
+            }
+        } else {
+            item["error"] = r.error.empty() ? "empty pipeline result" : r.error;
+        }
+        manifest.push_back(item);
+        files.push_back(item);
+    }
+
+    // 5. manifest 落盘（R3 重生成与 exe 通知的定位依据）
+    std::string manifestFile = (fs::path(config_.udrt_output_dir) / (stem + ".assets.json")).string();
+    {
+        json mjson{{"avatar_file", avatarAbs},
+                   {"stem", stem},
+                   {"updated_at", std::time(nullptr)},
+                   {"assets", manifest}};
+        std::ofstream ofs(manifestFile, std::ios::binary | std::ios::trunc);
+        if (ofs) ofs << mjson.dump(2);
+    }
+
+    json ok{{"avatar_file", avatarAbs},
+            {"nodes", entries.size()},
+            {"generated", generated},
+            {"failed", entries.size() - generated},
+            {"manifest", manifestFile},
+            {"files", files}};
+    if (generated > 0) {
+        ok["html_file_example"] = firstHtml;
+        // V1.5.0 R2: 生成完成后启动 Avatar.exe 加载工程（AUTO_LAUNCH 开关控制）
+        autoLaunchProject("avatar", avatarAbs);
+        // R3: 逐条通知订阅该工程的 exe
+        for (const auto& item : manifest) {
+            if (!item.contains("html_file")) continue;
+            EventHub::instance().publish("asset_updated",
+                                         json{{"project", avatarAbs},
+                                              {"guid", item.value("guid", "")},
+                                              {"file", item.value("file", "")},
+                                              {"version", 1},
+                                              {"reason", "create"}},
+                                         avatarAbs);
+        }
+    }
+
+    // V1.5.1: 逐节点写工程资产上下文（GUID → 重生成操作参数），副本即唯一工作文件
+    {
+        AssetContextStore ctxStore(config_.udrt_output_dir);
+        std::string cerr2;
+        for (size_t i = 0; i < entries.size() && i < guids.size(); ++i) {
+            AssetContext c;
+            c.guid = guids[i];
+            c.nodePtr = entries[i].nodePtr;
+            c.nodeId = entries[i].nodeId;
+            c.kind = "avatar_text";
+            c.sourceFile = avatarAbs;
+            c.entryId = "saturn_subtitle_html";   // avatar 流程固定走字幕管线
+            c.stylePrompt = stylePrompt;
+            c.background = reqs[i].wants_background;
+            c.text = entries[i].text;
+            c.htmlFile = i < results.size() && results[i].ok && !results[i].final_html.empty()
+                             ? (fs::path(config_.udrt_output_dir) /
+                                (stem + "_" + twoDigit(i) + "_" +
+                                 (guids[i].size() >= 8 ? guids[i].substr(0, 8) : guids[i]) +
+                                 ".html"))
+                                   .string()
+                             : std::string();
+            c.version = 1;
+            c.chatId = m_chatId;
+            ctxStore.record(c, &cerr2);
+        }
+    }
+    return ok.dump();
+}
+
+std::string AgentGraph::rerunSubtitlePipeline(const std::string& guid, const std::string& text,
+                                              const std::string& style, bool background,
+                                              std::string* err) const {
+    AssetRunnerConfig rc;
+    rc.api_key = config_.llm_api_key;
+    rc.base_url = config_.llm_base_url;
+    rc.model = config_.llm_model;
+    rc.system_prompt = kSubtitleSystemPrompt;
+    auto assetProvider = std::make_shared<WinHttpProvider>(llm_, config_);
+    AssetGraphRunner runner(rc, assetProvider);
+
+    AssetRequest req;
+    req.guid = guid;
+    req.short_id = "rg_" + (guid.size() >= 8 ? guid.substr(0, 8) : guid);
+    req.user_text = text;
+    req.context = json{{"content", text}, {"style", style}};
+    req.wants_background = background;
+    auto results = runner.run({std::move(req)}, defaultSubtitlePipeline(), nullptr);
+    const auto& r = results.front();
+    if (!r.ok || r.final_html.empty()) {
+        if (err) *err = r.error.empty() ? "empty pipeline result" : r.error;
+        return {};
+    }
+    return r.final_html;
+}
+
+std::string AgentGraph::regenerateAvatarNode(const std::string& project,
+                                             const std::string& nodePtr,
+                                             const std::string& nodeId,
+                                             const std::string& newText) {
+    // 串行化重生成（低频场景：避免 manifest 并发写坏；尾写胜出即天然去抖）
+    static std::mutex regenMutex;
+    std::lock_guard<std::mutex> lock(regenMutex);
+
+    auto errOut = [](const std::string& msg, const std::string& hint) {
+        return json{{"error", msg}, {"repairable", true}, {"hint", hint}}.dump();
+    };
+    if (newText.empty())
+        return errOut("newText is required", "changes[].value 为新的字幕文本");
+
+    // V1.5.1: guid 直查路径（changes 可传 guid；此时 project 可空）。
+    // 样式/背景从 AssetContext 恢复——重生成不再丢原始样式。
+    AssetContextStore ctxStore(config_.udrt_output_dir);
+    AssetContext cached;
+    if (project.empty() && !nodePtr.empty() &&
+        ctxStore.findByGuid(nodePtr, &cached, nullptr)) {
+        std::string perr;
+        const std::string html = rerunSubtitlePipeline(
+            cached.guid, newText, cached.stylePrompt, cached.background, &perr);
+        if (html.empty()) return errOut(perr, "重生成失败，可重试");
+        std::ofstream ofs(cached.htmlFile, std::ios::binary | std::ios::trunc);
+        if (!ofs) return errOut("cannot open file for write: " + cached.htmlFile, "");
+        ofs.write(html.data(), (std::streamsize)html.size());
+        ctxStore.appendHistory(cached.guid, "notify", newText, "exe", nullptr);
+        EventHub::instance().publish("asset_updated",
+                                     json{{"project", cached.sourceFile},
+                                          {"guid", cached.guid},
+                                          {"file", makeRelative(cached.htmlFile)},
+                                          {"version", cached.version + 1},
+                                          {"reason", "regenerate"}},
+                                     cached.sourceFile);
+        return json{{"ok", true},
+                    {"file", makeRelative(cached.htmlFile)},
+                    {"html_file", cached.htmlFile},
+                    {"guid", cached.guid},
+                    {"version", cached.version + 1}}.dump();
+    }
+
+    namespace fs = std::filesystem;
+    std::string p = project;
+    for (auto& ch : p) if (ch == '/') ch = '\\';
+    fs::path proj = fs::path(p);
+    if (!proj.is_absolute()) proj = fs::path(config_.exe_dir) / p;
+    std::error_code ec;
+    if (!fs::exists(proj, ec))
+        return errOut("project not found: " + proj.string(), "project 须为 create_avatar_assets 处理过的 .avatar 绝对路径");
+
+    const std::string stem = proj.stem().string();
+    const std::string manifestFile =
+        (fs::path(config_.udrt_output_dir) / (stem + ".assets.json")).string();
+    if (!fs::exists(manifestFile, ec))
+        return errOut("manifest not found: " + manifestFile,
+                      "该工程尚未由 create_avatar_assets 生成过资产");
+
+    json m;
+    try {
+        std::ifstream ifs(manifestFile, std::ios::binary);
+        if (!ifs) return errOut("cannot open manifest: " + manifestFile, "");
+        std::ostringstream ss;
+        ss << ifs.rdbuf();
+        m = json::parse(ss.str());
+    } catch (const std::exception& e) {
+        return errOut("manifest parse error: " + std::string(e.what()), "");
+    }
+    if (!m.contains("assets") || !m["assets"].is_array())
+        return errOut("manifest has no assets array", "");
+
+    json* target = nullptr;
+    for (auto& it : m["assets"]) {
+        if (!nodePtr.empty()) {
+            if (it.value("node_ptr", "") == nodePtr) { target = &it; break; }
+        } else if (!nodeId.empty() && it.value("node_id", "") == nodeId) {
+            target = &it;   // node_id 为块类型可能重复：取首个匹配（契约建议传 ptr）
+            break;
+        }
+    }
+    if (!target)
+        return errOut("node not found in manifest (ptr=" + nodePtr + ", id=" + nodeId + ")",
+                      "node_ptr 优先；可先 GET manifest 核对清单");
+    if (!target->contains("html_file"))
+        return errOut("node has no previously generated html", "上次生成失败的节点无法原位重生成，请重跑 create_avatar_assets");
+
+    const std::string guid = target->value("guid", "");
+    const std::string htmlFile = target->value("html_file", "");
+    const int version = target->value("version", 1);
+    // V1.5.1: 样式/背景从 AssetContext 记录恢复（重生成保持原始样式）
+    const std::string stylePrompt = target->value("style_prompt", "");
+    const bool wantsBg = target->value("background", false);
+
+    std::string perr;
+    const std::string html =
+        rerunSubtitlePipeline(guid, newText, stylePrompt, wantsBg, &perr);
+    if (html.empty())
+        return errOut(perr, "重生成失败，可重试");
+
+    std::ofstream ofs(htmlFile, std::ios::binary | std::ios::trunc);
+    if (!ofs) return errOut("cannot open file for write: " + htmlFile, "");
+    ofs.write(html.data(), (std::streamsize)html.size());
+
+    const int newVersion = version + 1;
+    (*target)["version"] = newVersion;
+    (*target)["text"] = newText;
+    if (!target->contains("history") || !(*target)["history"].is_array())
+        (*target)["history"] = json::array();
+    (*target)["history"].push_back({{"version", newVersion},
+                                    {"text", newText},
+                                    {"reason", "notify"},
+                                    {"source", "exe"},
+                                    {"at", (long long)std::time(nullptr) * 1000}});
+    {
+        std::ofstream mofs(manifestFile, std::ios::binary | std::ios::trunc);
+        if (mofs) mofs << m.dump(2);
+    }
+
+    EventHub::instance().publish("asset_updated",
+                                 json{{"project", proj.string()},
+                                      {"guid", guid},
+                                      {"file", makeRelative(htmlFile)},
+                                      {"version", newVersion},
+                                      {"reason", "regenerate"}},
+                                 proj.string());
+    Logf("[avatar_regen] node_ptr=%s file=%s version=%d", nodePtr.c_str(),
+         htmlFile.c_str(), newVersion);
+
+    return json{{"ok", true},
+                {"file", makeRelative(htmlFile)},
+                {"html_file", htmlFile},
+                {"guid", guid},
+                {"node_ptr", target->value("node_ptr", "")},
+                {"version", newVersion}}.dump();
 }
 
 std::string AgentGraph::toolGetNodeContext(const std::string& guid) const {
@@ -708,14 +1200,44 @@ std::string AgentGraph::toolGetNodeContext(const std::string& guid) const {
     return ctx.dump();
 }
 
+std::string AgentGraph::toolGetAssetContext(const std::string& guid) const {
+    // V1.5.1 按需发送：LLM 需要资产的操作参数时按需取结构化切片（不含对话全文）
+    if (guid.empty()) {
+        return json{{"error", "guid is required"},
+                    {"missing", json::array({"guid"})},
+                    {"repairable", true},
+                    {"hint", "guid 取自 create_udrt / create_avatar_assets 返回结果"}}.dump();
+    }
+    AssetContextStore ctxStore(config_.udrt_output_dir);
+    AssetContext c;
+    std::string err;
+    if (!ctxStore.findByGuid(guid, &c, &err)) {
+        return json{{"error", err},
+                    {"repairable", true},
+                    {"hint", "该 GUID 无工程资产上下文（可能由 Node 网关生成，或已随会话删除）"}}.dump();
+    }
+    return json{{"guid", c.guid},
+                {"kind", c.kind},
+                {"source_file", c.sourceFile},
+                {"entry_id", c.entryId},
+                {"style_prompt", c.stylePrompt},
+                {"background", c.background},
+                {"text", c.text},
+                {"html_file", c.htmlFile},
+                {"version", c.version},
+                {"history", c.history}}.dump();
+}
+
 // ------------------------------------------------------------------
 // run()：Agent Loop 主路径（LLM 自主工具调用），异常回退固定管线
 // ------------------------------------------------------------------
 
 std::string AgentGraph::run(const std::string& userMessage,
                             const std::vector<ChatMessage>& history,
-                            const EventSink& sink, std::string* error) {
+                            const EventSink& sink, std::string* error,
+                            const std::string& chatId) {
     m_activeSink = &sink;
+    m_chatId = chatId;
     if (sink.onStatus) sink.onStatus("正在分析需求（Agent Loop 工具编排）…");
     std::string reply;
     try {
@@ -730,6 +1252,8 @@ std::string AgentGraph::run(const std::string& userMessage,
         tools.push_back(std::make_unique<CreateUdrtTool>(this));
         tools.push_back(std::make_unique<GenerateNodeAssetTool>(this));
         tools.push_back(std::make_unique<ReviewAssetTool>(this));
+        tools.push_back(std::make_unique<CreateAvatarAssetsTool>(this));
+        tools.push_back(std::make_unique<GetAssetContextTool>(this));
         tools.push_back(std::make_unique<GetNodeContextTool>(this));
 
         // 3. Agent Loop（LLM 自主决定调用工具的次数与顺序，max_iterations 止损）
@@ -780,6 +1304,7 @@ std::string AgentGraph::run(const std::string& userMessage,
         reply.clear();
     }
     m_activeSink = nullptr;
+    m_chatId.clear();
 
     if (reply.empty())
         reply = runLegacyPipeline(userMessage, history, sink, error);
@@ -943,6 +1468,27 @@ std::string AgentGraph::makeRelative(const std::string& absolute) const {
     if (!b.empty() && b.back() != '\\') b += '\\';
     if (a.rfind(b, 0) == 0) return a.substr(b.size());
     return absolute;
+}
+
+void AgentGraph::autoLaunchProject(const std::string& kind, const std::string& projectPath) const {
+    if (projectPath.empty()) return;
+    if (!config_.auto_launch) {
+        if (m_activeSink && m_activeSink->onStatus)
+            m_activeSink->onStatus("工程已就绪（自动启动未开启，可通过 /api/launch 启动宿主程序）");
+        return;
+    }
+    const std::string& exe = (kind == "avatar") ? config_.avatar_exe : config_.udrt_exe;
+    DWORD pid = 0;
+    std::string err;
+    if (ProcessLauncher::instance().launch(kind, exe, projectPath, &pid, &err)) {
+        if (m_activeSink && m_activeSink->onStatus)
+            m_activeSink->onStatus(
+                "已启动 " + std::string(kind == "avatar" ? "Avatar.exe" : "UDeepRT.exe") +
+                " 加载工程（pid " + std::to_string(pid) + "）");
+    } else {
+        if (m_activeSink && m_activeSink->onStatus)
+            m_activeSink->onStatus("自动启动宿主程序失败：" + err);
+    }
 }
 
 std::string AgentGraph::runLegacyPipeline(const std::string& userMessage,

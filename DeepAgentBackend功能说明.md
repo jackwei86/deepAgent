@@ -337,4 +337,41 @@ msbuild E:\totem_AI\DeepAgent\DeepAgent.sln -p:Configuration=Debug -p:Platform=x
 
 **LLM 传输通道（V1.4.0 修复）**：NeoGraph `OpenAIProvider`（asio ConnPool 异步链路）在本服务进程内挂起不前，曾导致 Agent Loop 自 V1.3.0 起静默回退 legacy 管线（"准备中"空窗 20s+ 的根因）。现改为自研 `WinHttpProvider`（`winhttp_provider.{h,cpp}`，WinHTTP 传输 + 完整 OpenAI 工具协议含流式 tool_calls），`AgentGraph::run()` 与 `AssetGraphRunner` 统一注入；`LlmClient` 抽出 `postChatJson`/`postChatStream` 通用请求层。实测同一条字幕生成请求 125s+ → 5.3s。**今后新增走 neograph LLM Provider 的代码一律使用 WinHttpProvider**。
 
-**测试**：`build_asset_test.bat` → `asset_feature_test.exe`，F1-F12 + G1-G12 共 73 项断言全通过。G 组覆盖：合法脚本/if 条件/语法错误拦截/未注册 plan/非对象返回/死循环超时中止（312ms 触发）/超内存中止/中文数据往返/结构化诊断 path·expected·actual·known_catalogs/phases 格式兼容。
+## 14. V1.5.0：.avatar 输入 · 工程启动器 · 双向 IPC（2026-09-22）
+
+> 计划与全部对比分析见 `E:\totem_AI\DeepAgent_V1.5.0_计划.md`。
+
+### .avatar 工程输入（批量字幕资产）
+- `avatar_parser.{h,cpp}`：手写轻量 XML 扫描（零依赖），提取 `nodes/node` 下 `<param key="text_in">` 的 `primary/standard/track` 文本；XML 实体反转义；`node.ptr` 为唯一主键
+- Agent 工具 `create_avatar_assets(path, style_prompt?, background?)`：逐节点批量经子步管线生成 HTML（`udrt\{工程名}_{序号}_{guid8}.html`）+ manifest `{工程名}.assets.json`（node_ptr↔guid↔file↔version）；逐节点发资产卡片；失败节点带 P0 修复线索
+- 入口：聊天中 `.avatar` 路径自动读取；📎 附件支持 `.avatar`（后端保存后告知 LLM 路径）
+
+### 工程宿主进程启动器
+- `process_launcher.{h,cpp}`：CreateProcessW + 句柄/PID 表 + 退出监视线程；同工程重复启动幂等；后端退出不杀宿主进程
+- 映射：`.avatar`→`Avatar.exe`、`.udrt`→`UDeepRT.exe`；`DEEPAGENT_AVATAR_EXE`/`DEEPAGENT_UDRT_EXE` 覆盖；`DEEPAGENT_AUTO_LAUNCH`（默认 0）控制生成完自动启动；`POST /api/launch`、`GET /api/processes`
+
+### 双向 IPC（DeepAgent ⇄ Avatar.exe / UDeepRT.exe）
+- `event_hub.{h,cpp}`：进程内广播 hub（独立队列/项目过滤/截断/keepalive）
+- `GET /api/exe/events?project=`（SSE）：事件 `asset_updated {project, guid, file, version, reason: create|regenerate|optimize}`
+- `POST /api/exe/notify`：exe 侧 text_in 变更 → 按 manifest 单节点重生成（回写同一 html、version+1）→ 实时推送
+- exe 侧接入契约（argv/订阅/notify/端口发现 `DEEPAGENT_BACKEND_URL`）见计划文档 §4，由 U-MetaApp 侧后续实施；**AIServices 未参与**
+
+### 测试
+F+G+H 合计 101 项断言全过；集成冒烟：.avatar 聊天生成 4 卡片、SSE 订阅收 create 事件、notify 重生成 version 递增且订阅端实时收到 regenerate、/api/launch 干跑 404、📎 附件流端到端。
+
+## 15. V1.5.1：工程资产上下文管理（按需发送）（2026-09-22）
+
+> 计划全文见 `E:\totem_AI\DeepAgent_V1.5.1_计划.md`。新增组件：`asset_context.{h,cpp}`。
+
+### 两层上下文
+- **结构化执行上下文（AssetContext）**：guid/node_ptr/来源工程副本/entry_id/style_prompt/background/text/html_file/version/chat_id/history——exe notify 重生成据此恢复参数，零 LLM 参与。存储：按工程 manifest `udrt\{stem}.assets.json` + 全局索引 `udrt\asset_index.json`（guid O(1) 定位）
+- **LLM 上下文按需发送**：`.avatar` 内容不再注入（仅路径提示，解析在工具内）；`.udrt` 内容注入保留；新工具 `get_asset_context(guid)` 按需查询；`review_asset` 响应附带 `style_prompt` 切片
+
+### 关键约定与修复
+- **工程副本即唯一工作文件**：路径输入/📎 附件的 `.udrt`/`.avatar` 服务端强制复制到 `projects\{chat_id}\`，源文件与项目解耦（不记录原始路径），后续修改只针对副本
+- **删除联动清理**：`DELETE /api/chats/{id}` 清理 `projects\{chat_id}` + 该会话全部资产产物 + manifest + 索引条目（只读文件先清属性再删）
+- **修复：notify 重生成丢失原始样式**——现从 AssetContext 恢复 `style_prompt`/`background`；changes 支持 `guid` 直查（project 可空）
+- **修复（既有缺陷）：资产生成管线从未消费 style_prompt**——`AssetGraphRunner::buildInput` 现将 `context.style` 按惯例（`\n\n样式要求：`）拼入 content 分支用户消息
+
+### 测试
+F+G+H 合计 116 项断言全过（新增 H5-H7：上下文往返/历史追加/按会话删除隔离）；集成冒烟：生成→副本/manifest/索引落位→guid 直查 notify（样式保持）→删除会话零残留。

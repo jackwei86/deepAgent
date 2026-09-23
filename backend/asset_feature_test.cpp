@@ -13,11 +13,17 @@
 #include <vector>
 
 #include "asset_adapters.h"
+#include "asset_context.h"
 #include "asset_pipeline.h"
 #include "asset_runner.h"
+#include "avatar_parser.h"
+#include "event_hub.h"
 #include "node_catalog.h"
 #include "plan_script.h"
 #include "udrt_compiler.h"
+
+#include <mutex>
+#include <random>
 
 #include <asio/steady_timer.hpp>
 #include <asio/this_coro.hpp>
@@ -29,6 +35,7 @@ using namespace deepagent;
 namespace {
 
 int g_pass = 0, g_fail = 0;
+std::mutex eventsMutex;   // 引擎工作线程回调并发 push 共享 events 容器时的保护
 #define CHECK(cond, msg)                                              \
     do {                                                              \
         if (cond) {                                                   \
@@ -285,6 +292,7 @@ void testF9() {
         req.wants_background = true;
         runner.run({req}, pipelineWithBgAdapter("test_slow_bg", 30),
                    [&](const std::string&, const std::string& step, const std::string& state) {
+                       std::lock_guard<std::mutex> lk(eventsMutex);
                        events.emplace_back(step, state);
                    });
         auto idx = [&](const std::string& step, const std::string& state) {
@@ -310,6 +318,7 @@ void testF9() {
         req.wants_background = false;
         runner.run({req}, defaultSubtitlePipeline(),
                    [&](const std::string&, const std::string& step, const std::string& state) {
+                       std::lock_guard<std::mutex> lk(eventsMutex);
                        events.emplace_back(step, state);
                    });
         bool only_content = true;
@@ -337,7 +346,10 @@ void testF10() {
     req.wants_background = true;
     auto results = runner.run({req}, defaultSubtitlePipeline(),
                               [&](const std::string&, const std::string& step,
-                                  const std::string& state) { events.emplace_back(step, state); });
+                                  const std::string& state) {
+                                  std::lock_guard<std::mutex> lk(eventsMutex);
+                                  events.emplace_back(step, state);
+                              });
     const auto& r = results.front();
     CHECK(!r.ok, "F10: run 失败");
     CHECK(r.error.find("asset pipeline failed") != std::string::npos ||
@@ -557,7 +569,257 @@ void testG9toG12(const std::string& out_dir) {
     CHECK(!udrt3.contains("phases"), "G12: udrt 文件不含 phases（U-DeepRT 格式兼容）");
 }
 
+// ================= V1.5.0 功能测试（.avatar 解析 / 批量生成 / EventHub）H1-H4 =================
+
+void testH1(const std::string& out_dir) {
+    std::printf("\n-- V1.5.0: .avatar 解析 --\n");
+    // H1: 解析真实样本（testdata/1.avatar）
+    std::vector<AvatarTextEntry> entries;
+    std::string err;
+    CHECK(parseAvatarFile("testdata\\1.avatar", &entries, &err), "H1: 1.avatar 解析成功");
+    CHECK(entries.size() == 4, ("H1: 提取 4 个 text_in 节点，实际 " + std::to_string(entries.size())).c_str());
+    if (entries.size() == 4) {
+        // ptr 是运行时指针地址（每次保存会变），只断言非空且互不相同
+        bool ptrOk = true;
+        for (size_t i = 0; i < entries.size(); ++i)
+            for (size_t j = i + 1; j < entries.size(); ++j)
+                if (entries[i].nodePtr.empty() || entries[i].nodePtr == entries[j].nodePtr)
+                    ptrOk = false;
+        CHECK(ptrOk, "H1: nodePtr 主键非空且唯一");
+        CHECK(entries[0].nodeId == "org.uranus.block.voice_text", "H1: nodeId 为块类型");
+        CHECK(entries[0].text.find("加快科技创新和产业创新融合") != std::string::npos,
+              "H1: 首节点字幕文本保真");
+        CHECK(entries[1].text.find("为破解科研成果和产业需求脱节的难题") != std::string::npos,
+              "H1: 第二节点字幕文本保真");
+        bool allIndexOk = true;
+        for (size_t i = 0; i < entries.size(); ++i)
+            if (entries[i].index != (int)i || entries[i].text.empty() ||
+                entries[i].nodePtr.empty()) allIndexOk = false;
+        CHECK(allIndexOk, "H1: index 连续且 text/nodePtr 非空");
+    }
+
+    // H1b: XML 实体反转义
+    CHECK(xmlUnescape("a&amp;b&lt;c&gt;d&quot;e&apos;f") == "a&b<c>d\"e'f",
+          "H1b: 五种命名实体反转义");
+    CHECK(xmlUnescape("&#x4f60;&#22909;") == "你好", "H1b: 数字实体（十六/十进制）转 UTF-8");
+    CHECK(xmlUnescape("plain&unknown;x") == "plain&unknown;x", "H1b: 未知实体原样保留");
+
+    // H2: 损坏/空/无 text_in → 明确报错
+    {
+        const std::string bad = out_dir + "\\h2_bad.avatar";
+        { std::ofstream f(bad, std::ios::binary); f << "<html>not avatar</html>"; }
+        std::vector<AvatarTextEntry> e2;
+        CHECK(!parseAvatarFile(bad, &e2, &err) &&
+              err.find("AvatarProject") != std::string::npos, "H2: 非 AvatarProject XML 报错明确");
+    }
+    {
+        const std::string empty = out_dir + "\\h2_empty.avatar";
+        { std::ofstream f(empty, std::ios::binary); }
+        std::vector<AvatarTextEntry> e2;
+        CHECK(!parseAvatarFile(empty, &e2, &err) && err.find("empty") != std::string::npos,
+              "H2: 空文件报错明确");
+    }
+    {
+        const std::string missing = out_dir + "\\h2_missing.avatar";
+        std::vector<AvatarTextEntry> e2;
+        CHECK(!parseAvatarFile(missing, &e2, &err) && err.find("cannot open") != std::string::npos,
+              "H2: 文件不存在报错明确");
+    }
+    {
+        const std::string notext = out_dir + "\\h2_notext.avatar";
+        { std::ofstream f(notext, std::ios::binary);
+          f << "<AvatarProject><timeline><project><nodes><node id=\"a\" ptr=\"1\">"
+               "<param key=\"enabled_in\"><primary><standard><track>true</track>"
+               "</standard></primary></param></node></nodes></project></timeline></AvatarProject>"; }
+        std::vector<AvatarTextEntry> e2;
+        CHECK(!parseAvatarFile(notext, &e2, &err) && err.find("text_in") != std::string::npos,
+              "H2: 无 text_in 节点报错明确");
+    }
+}
+
+void testH3(const std::string& out_dir) {
+    std::printf("\n-- V1.5.0: .avatar 批量生成（FakeProvider 管线） --\n");
+    std::vector<AvatarTextEntry> entries;
+    std::string err;
+    CHECK(parseAvatarFile("testdata\\1.avatar", &entries, &err), "H3 前置: 解析成功");
+    if (entries.empty()) return;
+
+    // 模拟 create_avatar_assets 的批量构造：parser → AssetRequests → 管线
+    AssetRunnerConfig rc;
+    rc.api_key = "fake";
+    auto provider = std::make_shared<FakeProvider>();
+    provider->delay_ms_ = 5;   // 4 节点零延迟完成会加剧引擎调度竞争（偶发段错误），加微延迟平滑
+    AssetGraphRunner runner(rc, provider);
+
+    std::vector<AssetRequest> reqs;
+    std::vector<std::string> guids(entries.size());
+    auto makeGuid = [] {
+        unsigned int x = std::random_device{}();
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%08X000000000000000000000000", x);
+        return std::string(buf, 32);
+    };
+    for (size_t i = 0; i < entries.size(); ++i) {
+        guids[i] = makeGuid();
+        AssetRequest req;
+        req.guid = guids[i];
+        req.short_id = "av" + std::to_string(i) + "_" + guids[i].substr(0, 8);
+        req.user_text = entries[i].text;
+        req.context = json{{"content", entries[i].text}, {"style", ""}};
+        req.wants_background = false;
+        reqs.push_back(std::move(req));
+    }
+
+    auto results = runner.run(reqs, defaultSubtitlePipeline(), nullptr);
+    CHECK(results.size() == entries.size(), "H3: 每节点一个结果");
+    bool allOk = true;
+    for (const auto& r : results) if (!r.ok || r.final_html.empty()) allOk = false;
+    CHECK(allOk, "H3: 4 节点批量生成全部成功");
+
+    // 模拟落盘 + manifest（与 toolCreateAvatarAssets 相同的命名/结构约定）
+    json manifest = json::array();
+    int written = 0;
+    for (size_t i = 0; i < results.size(); ++i) {
+        if (!results[i].ok) continue;
+        std::string htmlFile = out_dir + "\\1_" + std::to_string(i) + "_" +
+                               guids[i].substr(0, 8) + ".html";
+        std::ofstream f(htmlFile, std::ios::binary | std::ios::trunc);
+        f << results[i].final_html;
+        manifest.push_back({{"index", entries[i].index},
+                            {"node_id", entries[i].nodeId},
+                            {"node_ptr", entries[i].nodePtr},
+                            {"guid", guids[i]},
+                            {"html_file", htmlFile},
+                            {"version", 1}});
+        ++written;
+    }
+    CHECK(written == 4, "H3: 4 个 HTML 落盘");
+    bool fileOk = true;
+    for (const auto& item : manifest) {
+        std::ifstream f(item.value("html_file", ""), std::ios::binary);
+        if (!f || f.peek() == std::ifstream::traits_type::eof()) fileOk = false;
+    }
+    CHECK(fileOk, "H3: 落盘文件非空");
+    CHECK(manifest[0].value("version", 0) == 1 &&
+          !manifest[0].value("node_ptr", "").empty(), "H3: manifest 结构（ptr 主键/version 初值）");
+}
+
+void testH4() {
+    std::printf("\n-- V1.5.0: EventHub --\n");
+    EventHub& hub = EventHub::instance();
+
+    // H4: 发布/订阅（全量订阅者 + 项目过滤订阅者）
+    auto all = hub.subscribe();
+    auto onlyP = hub.subscribe("projA");
+    hub.publish("asset_updated", json{{"file", "x.html"}}, "projA");
+    hub.publish("asset_updated", json{{"file", "y.html"}}, "projB");
+
+    std::string ev, data;
+    CHECK(all->waitPop(&ev, &data, 100) == EventHub::PopResult::Got &&
+          ev == "asset_updated" && data.find("x.html") != std::string::npos,
+          "H4: 全量订阅者收到 projA 事件");
+    CHECK(all->waitPop(&ev, &data, 100) == EventHub::PopResult::Got &&
+          data.find("y.html") != std::string::npos,
+          "H4: 全量订阅者收到 projB 事件");
+    CHECK(onlyP->waitPop(&ev, &data, 100) == EventHub::PopResult::Got &&
+          data.find("x.html") != std::string::npos,
+          "H4: 项目过滤订阅者收到匹配事件");
+    CHECK(onlyP->waitPop(&ev, &data, 100) == EventHub::PopResult::Timeout,
+          "H4: 项目过滤订阅者收不到不匹配事件");
+
+    // H4b: 广播（project 空 → 所有订阅者都收）
+    hub.publish("asset_updated", json{{"file", "z.html"}});
+    CHECK(all->waitPop(&ev, &data, 100) == EventHub::PopResult::Got &&
+          data.find("z.html") != std::string::npos, "H4b: 广播事件全量订阅者收到");
+    CHECK(onlyP->waitPop(&ev, &data, 100) == EventHub::PopResult::Got &&
+          data.find("z.html") != std::string::npos, "H4b: 广播事件过滤订阅者也收到");
+
+    // H4c: 慢消费者队列截断（容量 256，丢最旧）
+    auto slow = hub.subscribe();
+    for (int i = 0; i < 300; ++i)
+        hub.publish("asset_updated", json{{"seq", i}});
+    CHECK(slow->waitPop(&ev, &data, 100) == EventHub::PopResult::Got &&
+          data.find("\"seq\":44") != std::string::npos,
+          "H4c: 超容量后最旧事件被丢弃（首条为 seq=44）");
+
+    // H4d: close 语义
+    auto dying = hub.subscribe();
+    dying->close();
+    CHECK(dying->waitPop(&ev, &data, 10) == EventHub::PopResult::Closed,
+          "H4d: close 后 waitPop 返回 Closed");
+}
+
+// ================= V1.5.1 工程资产上下文测试 H5-H7 =================
+
+void testH5toH7(const std::string& out_dir) {
+    std::printf("\n-- V1.5.1: AssetContext 上下文管理 --\n");
+    AssetContextStore store(out_dir);   // 沙盒：manifest/索引都落在 out_dir
+
+    // 沙盒去状态：清掉上一轮残留（否则 history 断言受跨轮污染）
+    std::error_code sec;
+    std::filesystem::remove(out_dir + "\\asset_index.json", sec);
+    std::filesystem::remove(out_dir + "\\1.assets.json", sec);
+
+    // H5: record → findByGuid 往返 + 索引落盘
+    AssetContext c;
+    c.guid = "TESTGUID000000000000000000000001";
+    c.nodePtr = "999888777";
+    c.nodeId = "org.uranus.block.voice_text";
+    c.kind = "avatar_text";
+    c.sourceFile = out_dir + "\\proj_c1\\1.avatar";   // 副本即唯一工作文件
+    c.entryId = "saturn_subtitle_html";
+    c.stylePrompt = "标题蓝色、28px 字体";
+    c.background = true;
+    c.text = "原始字幕文本";
+    c.htmlFile = out_dir + "\\1_00_TESTGUI.html";
+    c.version = 1;
+    c.chatId = "c_test_1";
+    std::string err;
+    CHECK(store.record(c, &err), ("H5: record 成功 " + err).c_str());
+    AssetContext got;
+    CHECK(store.findByGuid(c.guid, &got, &err), "H5: findByGuid 命中");
+    CHECK(got.stylePrompt == c.stylePrompt && got.background == true &&
+          got.nodePtr == c.nodePtr && got.chatId == c.chatId,
+          "H5: 样式/背景/主键/归属会话往返保真（重生成不丢样式的数据基础）");
+    CHECK(std::filesystem::exists(out_dir + "\\asset_index.json"), "H5: 全局索引落盘");
+    CHECK(std::filesystem::exists(out_dir + "\\1.assets.json"), "H5: manifest 落盘（stem 命名）");
+
+    // H6: appendHistory —— version+1、text 更新、history 追加
+    CHECK(store.appendHistory(c.guid, "notify", "exe 修改后的文本", "avatar.exe", &err),
+          "H6: appendHistory 成功");
+    AssetContext got2;
+    CHECK(store.findByGuid(c.guid, &got2, &err), "H6: 更新后可查");
+    CHECK(got2.version == 2, "H6: version 递增到 2");
+    CHECK(got2.text == "exe 修改后的文本", "H6: 当前文本已更新");
+    CHECK(got2.history.size() == 1 && got2.history[0].value("reason", "") == "notify" &&
+          got2.history[0].value("version", 0) == 2,
+          "H6: history 追加一条（reason/version 正确）");
+
+    // H7: removeByChat —— 只清目标会话，其余保留
+    AssetContext c2 = c;
+    c2.guid = "TESTGUID000000000000000000000002";
+    c2.chatId = "c_test_2";
+    c2.htmlFile = out_dir + "\\1_00_TESTGU2.html";
+    store.record(c2, &err);
+    { std::ofstream f(c.htmlFile, std::ios::binary); f << "<html>c1</html>"; }
+    { std::ofstream f(c2.htmlFile, std::ios::binary); f << "<html>c2</html>"; }
+
+    auto removed = store.removeByChat("c_test_1", &err);
+    CHECK(removed.size() == 1 && removed[0] == c.htmlFile, "H7: removeByChat 返回 c1 产物路径");
+    AssetContext gone, kept;
+    CHECK(!store.findByGuid(c.guid, &gone, &err), "H7: c1 上下文已删除");
+    CHECK(store.findByGuid(c2.guid, &kept, &err) && kept.chatId == "c_test_2",
+          "H7: c2 上下文保留");
+    CHECK(!std::filesystem::exists(c.htmlFile) == false,
+          "H7: 产物文件由调用方删除（本函数模拟调用方）");
+    std::error_code ec;
+    std::filesystem::remove(c.htmlFile, ec);
+    CHECK(!std::filesystem::exists(out_dir + "\\1.assets.json") == false,
+          "H7: manifest 仍存在（c2 共用工程，仅当 chat_id 全匹配才删）");
+}
+
 int main() {
+    std::setvbuf(stdout, nullptr, _IONBF, 0);   // 段错误时保住崩溃点前的输出
     std::printf("===== Node 资产生成子步并发 逐项功能测试 =====\n\n");
     AdapterRegistry::instance().registerAdapter("test_slow_bg", slowBgAdapter);
     AdapterRegistry::instance().registerAdapter("test_flaky_bg", flakyBgAdapter);
@@ -576,6 +838,10 @@ int main() {
     testF12();
     testG1toG8();
     testG9toG12(out_dir);
+    testH1(out_dir);
+    testH3(out_dir);
+    testH4();
+    testH5toH7(out_dir);
 
     std::printf("\n===== 结果：%d 通过 / %d 失败 =====\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

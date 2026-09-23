@@ -85,6 +85,11 @@ Config Config::load(const std::string& root_dir, const std::string& exe_dir) {
     if (!cfg.udrt_output_dir.empty() && cfg.udrt_output_dir[1] != ':') {
         cfg.udrt_output_dir = exe_dir + "\\" + cfg.udrt_output_dir;
     }
+
+    // 工程宿主进程启动（V1.5.0）
+    cfg.auto_launch = envOr(fileVars, "DEEPAGENT_AUTO_LAUNCH", "0") == "1";
+    cfg.avatar_exe  = envOr(fileVars, "DEEPAGENT_AVATAR_EXE", exe_dir + "\\Avatar.exe");
+    cfg.udrt_exe    = envOr(fileVars, "DEEPAGENT_UDRT_EXE", exe_dir + "\\UDeepRT.exe");
     return cfg;
 }
 
